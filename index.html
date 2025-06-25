@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Calendrier Sapeurs-Pompiers</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-header">
+        <div class="app-title">🚒 CRM Calendrier 2026</div>
+        <div class="app-subtitle">Sapeurs-Pompiers Clermont-l'Hérault</div>
+    </div>
+
+    <div class="main-container">
+        <div class="user-info">
+            <div class="user-avatar" id="userAvatar">S</div>
+            <div class="user-details">
+                <h3 id="userName">Stève</h3>
+                <p id="userRole">Responsable Commercial</p>
+            </div>
+        </div>
+
+        <!-- Menu Principal -->
+        <div id="mainMenu" class="menu-section">
+            <h2 class="section-title">⚡ Actions Rapides</h2>
+            <div class="menu-grid">
+                <button class="menu-item" onclick="showAction('facture')">
+                    <div class="emoji">📄</div>
+                    <div class="label">Générer<br>Facture</div>
+                </button>
+                <button class="menu-item" onclick="showAction('bon_commande')">
+                    <div class="emoji">📋</div>
+                    <div class="label">Bon de<br>Commande</div>
+                </button>
+                <button class="menu-item" onclick="showAction('formulaire')">
+                    <div class="emoji">📝</div>
+                    <div class="label">Envoyer<br>Formulaire</div>
+                </button>
+                <button class="menu-item" onclick="showAction('stats')">
+                    <div class="emoji">📊</div>
+                    <div class="label">Statistiques<br>Express</div>
+                </button>
+            </div>
+
+            <h2 class="section-title" style="margin-top: 24px;">🏢 Gestion Entreprises</h2>
+            <div class="menu-grid">
+                <button class="menu-item" onclick="showSearch()">
+                    <div class="emoji">🔍</div>
+                    <div class="label">Recherche<br>Entreprise</div>
+                </button>
+                <button class="menu-item" onclick="showAction('nouvelle_entreprise')">
+                    <div class="emoji">➕</div>
+                    <div class="label">Nouvelle<br>Entreprise</div>
+                </button>
+                <button class="menu-item" onclick="showAction('qualification')">
+                    <div class="emoji">🎯</div>
+                    <div class="label">Qualification<br>Prospect</div>
+                </button>
+                <button class="menu-item" onclick="showAction('attribution')">
+                    <div class="emoji">👤</div>
+                    <div class="label">Attribution<br>Prospecteur</div>
+                </button>
+            </div>
+
+            <button class="menu-item large" onclick="showAction('intelligence')">
+                <div class="emoji">🧠</div>
+                <div class="label" style="font-size: 16px;">Intelligence CRM & Analyses Avancées</div>
+            </button>
+        </div>
+
+        <!-- Interface de Recherche -->
+        <div id="searchInterface" class="menu-section hidden">
+            <h2 class="section-title">🔍 Recherche Entreprise</h2>
+            <div class="search-container">
+                <div class="search-icon">🔍</div>
+                <input type="text" 
+                       class="search-input" 
+                       id="searchInput"
+                       placeholder="Tapez le nom de l'entreprise..."
+                       oninput="handleSearch(this.value)">
+            </div>
+            <div class="search-results" id="searchResults"></div>
+            <button class="btn btn-secondary" onclick="showMainMenu()">← Retour au menu</button>
+        </div>
+
+        <!-- États Conversationnels -->
+        <div id="conversationState" class="conversation-state">
+            <div class="state-title" id="stateTitle">Génération Document</div>
+            <div id="stateContent">
+                <!-- Contenu dynamique selon l'état -->
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <span id="statusText">🟢 CRM connecté • MCP Active • Agent CRM prêt</span>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
