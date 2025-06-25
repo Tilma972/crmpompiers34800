@@ -1,5 +1,8 @@
 // Configuration Telegram WebApp
 let tg = window.Telegram.WebApp;
+
+// Import configuration des webhooks n8n
+import N8N_WEBHOOKS from './config.js';
         
 // Initialisation
 tg.ready();
@@ -166,26 +169,28 @@ function handleEnterpriseSearch(query) {
 
 async function searchEnterprises(query) {
     try {
-        // Simulation d'appel à l'API Baserow via n8n webhook
-        const mockResults = [
-            {
-                id: 476,
-                nom_entreprise: "231 Street",
-                commune: "CLERMONT-L'HÉRAULT",
-                interlocuteur: "Gracia Yannick",
-                email: "restoburgers34@hotmail.com"
+        // Appel à l'API Baserow via n8n webhook Agent CRM
+        const response = await fetch(N8N_WEBHOOKS.AGENT_CRM, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
             },
-            {
-                id: 478,
-                nom_entreprise: "Accents Baroques", 
-                commune: "BRIGNAC",
-                interlocuteur: "",
-                email: ""
-            }
-        ];
+            body: JSON.stringify({
+                action: 'search_enterprises',
+                data: {
+                    query: query,
+                    user_id: user.id
+                }
+            })
+        });
 
-        displaySearchResults(mockResults);
-        updateStatus(`${mockResults.length} résultat(s) trouvé(s)`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const results = await response.json();
+        displaySearchResults(results.data || []);
+        updateStatus(`${(results.data || []).length} résultat(s) trouvé(s)`);
     } catch (error) {
         console.error('Erreur recherche:', error);
         updateStatus('❌ Erreur de recherche');
@@ -193,18 +198,28 @@ async function searchEnterprises(query) {
 }
 
 async function searchEnterprisesForAction(query) {
-    // Même logique que searchEnterprises mais pour les actions
     try {
-        const mockResults = [
-            {
-                id: 476,
-                nom_entreprise: "231 Street",
-                commune: "CLERMONT-L'HÉRAULT",
-                interlocuteur: "Gracia Yannick"
-            }
-        ];
+        // Appel à l'API Baserow via n8n webhook Agent CRM
+        const response = await fetch(N8N_WEBHOOKS.AGENT_CRM, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'search_enterprises',
+                data: {
+                    query: query,
+                    user_id: user.id
+                }
+            })
+        });
 
-        displayEnterpriseResults(mockResults);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const results = await response.json();
+        displayEnterpriseResults(results.data || []);
     } catch (error) {
         console.error('Erreur recherche entreprise:', error);
     }
@@ -275,16 +290,41 @@ async function executeAction() {
     updateStatus('⚡ Exécution en cours...');
     
     try {
-        // Appel workflow n8n déterministe
-        const payload = {
-            action: currentAction,
-            enterprise_id: selectedEnterprise.id,
-            enterprise_name: selectedEnterprise.name,
-            user_id: user.id
-        };
+        // Sélection du bon webhook selon l'action
+        let webhookUrl;
+        switch(currentAction) {
+            case 'facture':
+            case 'bon_commande':
+                webhookUrl = N8N_WEBHOOKS.PDF_GENERATOR;
+                break;
+            case 'formulaire':
+                webhookUrl = N8N_WEBHOOKS.FORM_ENTREPRISE;
+                break;
+            default:
+                webhookUrl = N8N_WEBHOOKS.AGENT_CRM;
+        }
 
-        // Simulation appel webhook n8n
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Appel webhook n8n avec payload standardisé
+        const response = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: currentAction,
+                data: {
+                    enterprise_id: selectedEnterprise.id,
+                    enterprise_name: selectedEnterprise.name,
+                    user_id: user.id
+                }
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
         
         tg.showAlert(`✅ ${getActionLabel(currentAction)} exécutée avec succès!`);
         updateStatus('✅ Action terminée');
@@ -312,14 +352,28 @@ async function createEnterprise() {
 
     try {
         // Appel Agent CRM pour validation et création
-        const payload = {
-            action: 'create_enterprise',
-            data: { nom, commune, contact, email },
-            user_id: user.id
-        };
+        const response = await fetch(N8N_WEBHOOKS.AGENT_CRM, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'create_enterprise',
+                data: {
+                    nom: nom,
+                    commune: commune,
+                    contact: contact,
+                    email: email,
+                    user_id: user.id
+                }
+            })
+        });
 
-        // Simulation appel Agent CRM via MCP
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
         
         tg.showAlert('✅ Entreprise créée et validée par l\'Agent CRM!');
         updateStatus('✅ Entreprise créée');
@@ -336,11 +390,33 @@ async function callAgentOrchestrator(request) {
     updateStatus('🧠 Agent Orchestrateur activé...');
     
     try {
-        // Redirection vers Agent Orchestrateur via Telegram
+        // Appel direct à l'Agent CRM (orchestrateur intégré)
+        const response = await fetch(N8N_WEBHOOKS.AGENT_CRM, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'orchestrate_intelligence',
+                data: {
+                    request: request,
+                    user_id: user.id
+                }
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+        // Redirection vers Agent via Telegram avec résultat
         tg.sendData(JSON.stringify({
             type: 'agent_request',
             request: request,
-            user_id: user.id
+            user_id: user.id,
+            orchestrator_response: result
         }));
         
     } catch (error) {

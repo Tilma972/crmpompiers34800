@@ -1,19 +1,16 @@
 // Configuration des URLs des webhooks n8n
-const N8N_WEBHOOKS = {
-    // Webhook pour la génération de factures
-    FACTURE: 'https://votre-domaine.n8n.cloud/webhook/facture',
+const N8N_WEBHOOKS = {       
+    // Agent CRM - Création et validation d'entreprises
+    AGENT_CRM: 'https://n8n.dsolution-ia.fr/webhook/crm_agent',
     
-    // Webhook pour les bons de commande
-    BON_COMMANDE: 'https://votre-domaine.n8n.cloud/webhook/bon-commande',
+    // PDF Generator - Génération de factures et bons de commande
+    PDF_GENERATOR: 'https://n8n.dsolution-ia.fr/webhook/pdf_generator',
     
-    // Webhook pour l'envoi de formulaires
-    FORMULAIRE: 'https://votre-domaine.n8n.cloud/webhook/formulaire',
+    // Email Workflow - Envoi de formulaires et emails
+    EMAIL_WORKFLOW: 'https://n8n.dsolution-ia.fr/webhook/email_workflow',
     
-    // Webhook pour la création d'entreprises
-    NOUVELLE_ENTREPRISE: 'https://votre-domaine.n8n.cloud/webhook/nouvelle-entreprise',
-    
-    // Webhook pour les statistiques
-    STATISTIQUES: 'https://votre-domaine.n8n.cloud/webhook/statistiques'
+    // Formulaire Entreprise - Workflows envoi de formulaire auto
+    FORM_ENTREPRISE: 'https://n8n.dsolution-ia.fr/webhook/form_entreprise'
 };
 
 // Exporter la configuration
