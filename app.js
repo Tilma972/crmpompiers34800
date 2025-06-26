@@ -8,21 +8,21 @@ const N8N_WEBHOOKS = {
 
     // API Entreprises - Recherche et gestion des entreprises
     ENTERPRISE_API: 'https://n8n.dsolution-ia.fr/webhook/recherche_entreprise',
-    
+
     // PDF Generator - Génération de factures et bons de commande
     PDF_GENERATOR: 'https://n8n.dsolution-ia.fr/webhook/pdf_generator',
-    
+
     // Email Workflow - Envoi de formulaires et emails
     EMAIL_WORKFLOW: 'https://n8n.dsolution-ia.fr/webhook/email_workflow',
-    
+
     // Formulaire Entreprise - Workflows envoi de formulaire auto
     FORM_ENTREPRISE: 'https://n8n.dsolution-ia.fr/webhook/form_entreprise'
 };
-        
+
 // Initialisation
 tg.ready();
 tg.expand();
-        
+
 // Variables d'état
 let currentState = 'main_menu';
 let selectedEnterprise = null;
@@ -44,11 +44,11 @@ function showMessage(message) {
             console.warn('tg.showAlert non supporté:', error);
         }
     }
-    
+
     // Fallback 1: updateStatus + console
     updateStatus(message);
     console.log('📱 Message:', message);
-    
+
     // Fallback 2: alert natif du navigateur si nécessaire
     if (message.includes('Erreur') || message.includes('❌')) {
         alert(message);
@@ -84,7 +84,7 @@ function showSearch() {
 
 function showAction(actionType) {
     currentAction = actionType;
-    
+
     if (actionType === 'intelligence') {
         // Redirection vers Agent Orchestrateur
         callAgentOrchestrator('Analyse commerciale avancée demandée');
@@ -122,7 +122,7 @@ function getActionLabel(actionType) {
 }
 
 function getStateContent(actionType) {
-    switch(actionType) {
+    switch (actionType) {
         case 'facture':
         case 'bon_commande':
         case 'formulaire':
@@ -181,7 +181,7 @@ function getStateContent(actionType) {
 // Recherche temps réel
 function handleSearch(query) {
     clearTimeout(searchTimeout);
-    
+
     if (query.length < 3) {
         document.getElementById('searchResults').style.display = 'none';
         return;
@@ -191,7 +191,7 @@ function handleSearch(query) {
     if (query === lastSearchQuery) {
         return;
     }
-    
+
     // Vérifier le cache
     if (searchCache[query]) {
         displaySearchResults(searchCache[query]);
@@ -200,7 +200,7 @@ function handleSearch(query) {
     }
 
     updateStatus('🔍 Recherche en cours...');
-    
+
     searchTimeout = setTimeout(() => {
         lastSearchQuery = query;
         searchEnterprises(query);
@@ -209,24 +209,24 @@ function handleSearch(query) {
 
 function handleEnterpriseSearch(query) {
     clearTimeout(searchTimeout);
-    
+
     if (query.length < 3) {
         document.getElementById('enterpriseResults').style.display = 'none';
         document.getElementById('executeBtn').disabled = true;
         return;
     }
-    
+
     // Éviter les appels identiques consécutifs
     if (query === lastSearchQuery) {
         return;
     }
-    
+
     // Vérifier le cache
     if (searchCache[query]) {
         displayEnterpriseResults(searchCache[query]);
         return;
     }
-    
+
     searchTimeout = setTimeout(() => {
         lastSearchQuery = query;
         searchEnterprisesForAction(query);
@@ -254,13 +254,13 @@ async function searchEnterprises(query) {
 
         const data = await response.json();
         const enterprises = data.data || [];
-        
+
         // Mettre en cache le résultat
         searchCache[query] = enterprises;
-        
+
         displaySearchResults(enterprises);
         updateStatus(`${enterprises.length} résultat(s) trouvé(s)`);
-        
+
     } catch (error) {
         console.error('Erreur recherche:', error);
         updateStatus('❌ Erreur de recherche');
@@ -288,12 +288,12 @@ async function searchEnterprisesForAction(query) {
 
         const data = await response.json();
         const enterprises = data.data || [];
-        
+
         // Mettre en cache le résultat
         searchCache[query] = enterprises;
-        
+
         displayEnterpriseResults(enterprises);
-        
+
     } catch (error) {
         console.error('Erreur recherche entreprise:', error);
         displayEnterpriseResults([]);
@@ -302,7 +302,7 @@ async function searchEnterprisesForAction(query) {
 
 function displaySearchResults(results) {
     const resultsDiv = document.getElementById('searchResults');
-    
+
     if (results.length === 0) {
         resultsDiv.innerHTML = '<div class="search-result-item">Aucun résultat trouvé</div>';
     } else {
@@ -317,13 +317,13 @@ function displaySearchResults(results) {
             </div>
         `).join('');
     }
-    
+
     resultsDiv.style.display = 'block';
 }
 
 function displayEnterpriseResults(results) {
     const resultsDiv = document.getElementById('enterpriseResults');
-    
+
     if (results.length === 0) {
         resultsDiv.innerHTML = '<div class="search-result-item">Aucun résultat trouvé</div>';
         document.getElementById('executeBtn').disabled = true;
@@ -336,20 +336,23 @@ function displayEnterpriseResults(results) {
         `).join('');
         document.getElementById('executeBtn').disabled = false;
     }
-    
+
     resultsDiv.style.display = 'block';
 }
 
 function selectEnterprise(id, name) {
     selectedEnterprise = { id, name };
     updateStatus(`Entreprise sélectionnée: ${name}`);
-    
+
     // Afficher détails entreprise ou actions possibles
     showMessage(`Entreprise sélectionnée: ${name}`);
 }
 
 function selectEnterpriseForAction(id, name) {
+    console.log('🎯 selectEnterpriseForAction appelée avec:', { id, name });
     selectedEnterprise = { id, name };
+    console.log('✅ selectedEnterprise mise à jour:', selectedEnterprise);
+
     document.getElementById('enterpriseInput').value = name;
     document.getElementById('enterpriseResults').style.display = 'none';
     document.getElementById('executeBtn').disabled = false;
@@ -357,57 +360,117 @@ function selectEnterpriseForAction(id, name) {
 }
 
 async function executeAction() {
+    // === DEBUG COMPLET ===
+    console.log('🔍 === DIAGNOSTIC EXECUTE ACTION ===');
+    console.log('1. selectedEnterprise:', selectedEnterprise);
+    console.log('2. currentAction:', currentAction);
+    console.log('3. currentState:', currentState);
+    console.log('4. executeBtn disabled:', document.getElementById('executeBtn')?.disabled);
+    console.log('5. Valeur input entreprise:', document.getElementById('enterpriseInput')?.value);
+
+    // Vérifier selectedEnterprise en détail
+    if (selectedEnterprise) {
+        console.log('✅ selectedEnterprise existe');
+        console.log('   - ID:', selectedEnterprise.id);
+        console.log('   - Name:', selectedEnterprise.name);
+    } else {
+        console.error('❌ selectedEnterprise est NULL ou UNDEFINED');
+        console.log('   - Type:', typeof selectedEnterprise);
+        console.log('   - Valeur exacte:', selectedEnterprise);
+    }
+
+    // Vérifier currentAction en détail
+    if (currentAction) {
+        console.log('✅ currentAction existe:', currentAction);
+    } else {
+        console.error('❌ currentAction est NULL ou UNDEFINED');
+        console.log('   - Type:', typeof currentAction);
+        console.log('   - Valeur exacte:', currentAction);
+    }
+
+    console.log('========================================');
+
+    // Test de validation original
     if (!selectedEnterprise || !currentAction) {
-        showMessage('Erreur: entreprise ou action manquante');
+        console.error('🚨 VALIDATION ÉCHEC - Détails:');
+        console.error('   - selectedEnterprise falsy?', !selectedEnterprise);
+        console.error('   - currentAction falsy?', !currentAction);
+
+        // Affichage d'erreur personnalisé selon le cas
+        if (!selectedEnterprise && !currentAction) {
+            updateStatus('❌ Entreprise ET action manquantes');
+            alert('DEBUG: Entreprise ET action manquantes');
+        } else if (!selectedEnterprise) {
+            updateStatus('❌ Entreprise manquante');
+            alert('DEBUG: Entreprise manquante - Avez-vous bien cliqué sur une entreprise dans la liste ?');
+        } else if (!currentAction) {
+            updateStatus('❌ Action manquante');
+            alert('DEBUG: Action manquante - currentAction vaut: ' + currentAction);
+        }
         return;
     }
 
+    console.log('✅ Validation OK, continuation...');
     updateStatus('⚡ Exécution en cours...');
-    
+
     try {
         // Sélection du bon webhook selon l'action
         let webhookUrl;
-        switch(currentAction) {
+        switch (currentAction) {
             case 'facture':
             case 'bon_commande':
                 webhookUrl = N8N_WEBHOOKS.PDF_GENERATOR;
+                console.log('🔗 Webhook PDF_GENERATOR sélectionné');
                 break;
             case 'formulaire':
                 webhookUrl = N8N_WEBHOOKS.FORM_ENTREPRISE;
+                console.log('🔗 Webhook FORM_ENTREPRISE sélectionné');
                 break;
             default:
                 webhookUrl = N8N_WEBHOOKS.AGENT_CRM;
+                console.log('🔗 Webhook AGENT_CRM par défaut');
         }
 
+        console.log('🌐 URL webhook:', webhookUrl);
+
+        const payload = {
+            action: currentAction,
+            data: {
+                enterprise_id: selectedEnterprise.id,
+                enterprise_name: selectedEnterprise.name,
+                user_id: user.id
+            }
+        };
+
+        console.log('📦 Payload à envoyer:', JSON.stringify(payload, null, 2));
+
         // Appel webhook n8n avec payload standardisé
+        console.log('🚀 Envoi requête vers n8n...');
         const response = await fetch(webhookUrl, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                action: currentAction,
-                data: {
-                    enterprise_id: selectedEnterprise.id,
-                    enterprise_name: selectedEnterprise.name,
-                    user_id: user.id
-                }
-            })
+            body: JSON.stringify(payload)
         });
+
+        console.log('📡 Réponse reçue - Status:', response.status);
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const result = await response.json();
-        
-        showMessage(`✅ ${getActionLabel(currentAction)} exécutée avec succès!`);
+        console.log('✅ Résultat n8n:', result);
+
         updateStatus('✅ Action terminée');
+        alert(`✅ ${getActionLabel(currentAction)} exécutée avec succès!`);
         showMainMenu();
-        
+
     } catch (error) {
-        console.error('Erreur exécution:', error);
-        showMessage('❌ Erreur lors de l\'exécution');
+        console.error('💥 Erreur complète:', error);
+        console.error('💥 Stack trace:', error.stack);
+        alert('❌ Erreur lors de l\'exécution: ' + error.message);
         updateStatus('❌ Erreur d\'exécution');
     }
 }
@@ -449,11 +512,11 @@ async function createEnterprise() {
         }
 
         const result = await response.json();
-        
+
         showMessage('✅ Entreprise créée et validée par l\'Agent CRM!');
         updateStatus('✅ Entreprise créée');
         showMainMenu();
-        
+
     } catch (error) {
         console.error('Erreur création:', error);
         showMessage('❌ Erreur lors de la création');
@@ -463,7 +526,7 @@ async function createEnterprise() {
 
 async function callAgentOrchestrator(request) {
     updateStatus('🧠 Agent Orchestrateur activé...');
-    
+
     try {
         // Appel direct à l'Agent CRM (orchestrateur intégré)
         const response = await fetch(N8N_WEBHOOKS.AGENT_CRM, {
@@ -485,7 +548,7 @@ async function callAgentOrchestrator(request) {
         }
 
         const result = await response.json();
-        
+
         // Redirection vers Agent via Telegram avec résultat
         tg.sendData(JSON.stringify({
             type: 'agent_request',
@@ -493,7 +556,7 @@ async function callAgentOrchestrator(request) {
             user_id: user.id,
             orchestrator_response: result
         }));
-        
+
     } catch (error) {
         console.error('Erreur Agent Orchestrateur:', error);
         showMessage('❌ Erreur communication Agent');
