@@ -184,7 +184,6 @@ async function searchEnterprises(query) {
         // Appel à la nouvelle API Entreprises
         const response = await fetch(N8N_WEBHOOKS.ENTERPRISE_API, {
             method: 'POST',
-            mode: 'no-cors',
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -195,28 +194,12 @@ async function searchEnterprises(query) {
             })
         });
 
-        if (response.type === 'opaque') {
-            // Mode no-cors - utiliser des données de fallback pour test
-            const fallbackResults = [
-                {
-                    id: 476,
-                    nom_entreprise: "231 Street",
-                    commune: "CLERMONT-L'HÉRAULT",
-                    interlocuteur: "Gracia Yannick",
-                    email: "restoburgers34@hotmail.com"
-                }
-            ];
-            displaySearchResults(fallbackResults);
-            updateStatus(`Recherche effectuée`);
-            return;
-        }
-
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const result = await response.json();
-        const enterprises = result.data || [];
+        const data = await response.json();
+        const enterprises = data.data || [];
         
         displaySearchResults(enterprises);
         updateStatus(`${enterprises.length} résultat(s) trouvé(s)`);
@@ -232,7 +215,6 @@ async function searchEnterprisesForAction(query) {
         // Appel à la nouvelle API Entreprises pour les actions
         const response = await fetch(N8N_WEBHOOKS.ENTERPRISE_API, {
             method: 'POST',
-            mode: 'no-cors',
             headers: {
                 'Content-Type': 'application/json'
             },
@@ -243,32 +225,17 @@ async function searchEnterprisesForAction(query) {
             })
         });
 
-        if (response.type === 'opaque') {
-            // Mode no-cors - utiliser des données de fallback pour test
-            const fallbackResults = [
-                {
-                    id: 476,
-                    nom_entreprise: "231 Street",
-                    commune: "CLERMONT-L'HÉRAULT",
-                    interlocuteur: "Gracia Yannick"
-                }
-            ];
-            displayEnterpriseResults(fallbackResults);
-            return;
-        }
-
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const result = await response.json();
-        const enterprises = result.data || [];
+        const data = await response.json();
+        const enterprises = data.data || [];
         
         displayEnterpriseResults(enterprises);
         
     } catch (error) {
         console.error('Erreur recherche entreprise:', error);
-        // Fallback en cas d'erreur
         displayEnterpriseResults([]);
     }
 }
