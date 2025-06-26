@@ -33,6 +33,28 @@ let searchTimeout = null;
 const searchCache = {};
 let lastSearchQuery = null;
 
+// Alternative pour tg.showAlert compatible avec toutes les versions Telegram
+function showMessage(message) {
+    // Essayer d'abord tg.showAlert si disponible
+    if (tg.showAlert && typeof tg.showAlert === 'function') {
+        try {
+            tg.showAlert(message);
+            return;
+        } catch (error) {
+            console.warn('tg.showAlert non supporté:', error);
+        }
+    }
+    
+    // Fallback 1: updateStatus + console
+    updateStatus(message);
+    console.log('📱 Message:', message);
+    
+    // Fallback 2: alert natif du navigateur si nécessaire
+    if (message.includes('Erreur') || message.includes('❌')) {
+        alert(message);
+    }
+}
+
 // Données utilisateur depuis Telegram
 const user = tg.initDataUnsafe?.user || {
     first_name: 'Stève',
@@ -323,7 +345,7 @@ function selectEnterprise(id, name) {
     updateStatus(`Entreprise sélectionnée: ${name}`);
     
     // Afficher détails entreprise ou actions possibles
-    tg.showAlert(`Entreprise sélectionnée: ${name}`);
+    showMessage(`Entreprise sélectionnée: ${name}`);
 }
 
 function selectEnterpriseForAction(id, name) {
@@ -336,7 +358,7 @@ function selectEnterpriseForAction(id, name) {
 
 async function executeAction() {
     if (!selectedEnterprise || !currentAction) {
-        tg.showAlert('Erreur: entreprise ou action manquante');
+        showMessage('Erreur: entreprise ou action manquante');
         return;
     }
 
@@ -379,13 +401,13 @@ async function executeAction() {
 
         const result = await response.json();
         
-        tg.showAlert(`✅ ${getActionLabel(currentAction)} exécutée avec succès!`);
+        showMessage(`✅ ${getActionLabel(currentAction)} exécutée avec succès!`);
         updateStatus('✅ Action terminée');
         showMainMenu();
         
     } catch (error) {
         console.error('Erreur exécution:', error);
-        tg.showAlert('❌ Erreur lors de l\'exécution');
+        showMessage('❌ Erreur lors de l\'exécution');
         updateStatus('❌ Erreur d\'exécution');
     }
 }
@@ -397,7 +419,7 @@ async function createEnterprise() {
     const email = document.getElementById('emailContact').value;
 
     if (!nom) {
-        tg.showAlert('Le nom de l\'entreprise est obligatoire');
+        showMessage('Le nom de l\'entreprise est obligatoire');
         return;
     }
 
@@ -428,13 +450,13 @@ async function createEnterprise() {
 
         const result = await response.json();
         
-        tg.showAlert('✅ Entreprise créée et validée par l\'Agent CRM!');
+        showMessage('✅ Entreprise créée et validée par l\'Agent CRM!');
         updateStatus('✅ Entreprise créée');
         showMainMenu();
         
     } catch (error) {
         console.error('Erreur création:', error);
-        tg.showAlert('❌ Erreur lors de la création');
+        showMessage('❌ Erreur lors de la création');
         updateStatus('❌ Erreur création');
     }
 }
@@ -474,7 +496,7 @@ async function callAgentOrchestrator(request) {
         
     } catch (error) {
         console.error('Erreur Agent Orchestrateur:', error);
-        tg.showAlert('❌ Erreur communication Agent');
+        showMessage('❌ Erreur communication Agent');
     }
 }
 
