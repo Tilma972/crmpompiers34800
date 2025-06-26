@@ -29,6 +29,10 @@ let selectedEnterprise = null;
 let currentAction = null;
 let searchTimeout = null;
 
+// Cache de recherche et optimisation
+const searchCache = {};
+let lastSearchQuery = null;
+
 // Données utilisateur depuis Telegram
 const user = tg.initDataUnsafe?.user || {
     first_name: 'Stève',
@@ -156,30 +160,55 @@ function getStateContent(actionType) {
 function handleSearch(query) {
     clearTimeout(searchTimeout);
     
-    if (query.length < 2) {
+    if (query.length < 3) {
         document.getElementById('searchResults').style.display = 'none';
+        return;
+    }
+
+    // Éviter les appels identiques consécutifs
+    if (query === lastSearchQuery) {
+        return;
+    }
+    
+    // Vérifier le cache
+    if (searchCache[query]) {
+        displaySearchResults(searchCache[query]);
+        updateStatus(`${searchCache[query].length} résultat(s) trouvé(s) (cache)`);
         return;
     }
 
     updateStatus('🔍 Recherche en cours...');
     
     searchTimeout = setTimeout(() => {
+        lastSearchQuery = query;
         searchEnterprises(query);
-    }, 300);
+    }, 800);
 }
 
 function handleEnterpriseSearch(query) {
     clearTimeout(searchTimeout);
     
-    if (query.length < 2) {
+    if (query.length < 3) {
         document.getElementById('enterpriseResults').style.display = 'none';
         document.getElementById('executeBtn').disabled = true;
         return;
     }
     
+    // Éviter les appels identiques consécutifs
+    if (query === lastSearchQuery) {
+        return;
+    }
+    
+    // Vérifier le cache
+    if (searchCache[query]) {
+        displayEnterpriseResults(searchCache[query]);
+        return;
+    }
+    
     searchTimeout = setTimeout(() => {
+        lastSearchQuery = query;
         searchEnterprisesForAction(query);
-    }, 300);
+    }, 800);
 }
 
 async function searchEnterprises(query) {
@@ -203,6 +232,9 @@ async function searchEnterprises(query) {
 
         const data = await response.json();
         const enterprises = data.data || [];
+        
+        // Mettre en cache le résultat
+        searchCache[query] = enterprises;
         
         displaySearchResults(enterprises);
         updateStatus(`${enterprises.length} résultat(s) trouvé(s)`);
@@ -234,6 +266,9 @@ async function searchEnterprisesForAction(query) {
 
         const data = await response.json();
         const enterprises = data.data || [];
+        
+        // Mettre en cache le résultat
+        searchCache[query] = enterprises;
         
         displayEnterpriseResults(enterprises);
         
