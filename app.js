@@ -9,6 +9,9 @@ const N8N_WEBHOOKS = {
     // API Entreprises - Recherche et gestion des entreprises
     ENTERPRISE_API: 'https://n8n.dsolution-ia.fr/webhook/recherche_entreprise',
 
+    // 🆕 NOUVEAU : Gateway Entities pour actions déterministes
+    GATEWAY_ENTITIES: 'https://n8n.dsolution-ia.fr/webhook/gateway_entities',
+
     // PDF Generator - Génération de factures et bons de commande
     PDF_GENERATOR: 'https://n8n.dsolution-ia.fr/webhook/pdf_generator',
 
@@ -138,6 +141,80 @@ function getStateContent(actionType) {
                     <button class="btn btn-secondary" onclick="showMainMenu()">Annuler</button>
                     <button class="btn btn-primary" onclick="executeAction()" disabled id="executeBtn">
                         Continuer
+                    </button>
+                </div>
+            `;
+
+        case 'qualification':
+            return `
+                <div class="form-group">
+                    <label class="form-label">Entreprise concernée :</label>
+                    <input type="text" class="form-input" id="enterpriseInput" 
+                           placeholder="Tapez le nom de l'entreprise..."
+                           oninput="handleEnterpriseSearch(this.value)">
+                </div>
+                <div id="enterpriseResults" class="search-results"></div>
+                
+                <div class="form-group">
+                    <label class="form-label">Format encart :</label>
+                    <select class="form-select" id="formatEncart">
+                        <option value="6X4">6x4 (350€)</option>
+                        <option value="6X8">6x8 (500€)</option>
+                        <option value="12X4">12x4 (500€)</option>
+                        <option value="12PARUTIONS">12 parutions (1800€)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Mois de parution :</label>
+                    <select class="form-select" id="moisParution">
+                        <option value="Janvier">Janvier</option>
+                        <option value="Février">Février</option>
+                        <option value="Mars">Mars</option>
+                        <option value="Avril">Avril</option>
+                        <option value="Mai">Mai</option>
+                        <option value="Juin">Juin</option>
+                        <option value="Juillet">Juillet</option>
+                        <option value="Août">Août</option>
+                        <option value="Septembre">Septembre</option>
+                        <option value="Octobre">Octobre</option>
+                        <option value="Novembre">Novembre</option>
+                        <option value="Décembre">Décembre</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Mode de paiement :</label>
+                    <select class="form-select" id="modePaiement">
+                        <option value="Virement">Virement bancaire</option>
+                        <option value="Cheque">Chèque</option>
+                        <option value="Carte">Carte bancaire</option>
+                        <option value="Especes">Espèces</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Contact (optionnel) :</label>
+                    <input type="text" class="form-input" id="interlocuteur" 
+                           placeholder="Nom du contact">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Email contact (optionnel) :</label>
+                    <input type="email" class="form-input" id="emailContact" 
+                           placeholder="email@exemple.com">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Commentaires (optionnel) :</label>
+                    <textarea class="form-input" id="commentaires" rows="3" 
+                              placeholder="Informations supplémentaires..."></textarea>
+                </div>
+                
+                <div class="form-buttons">
+                    <button class="btn btn-secondary" onclick="showMainMenu()">Annuler</button>
+                    <button class="btn btn-primary" onclick="createQualification()" disabled id="executeBtn">
+                        Créer Qualification
                     </button>
                 </div>
             `;
@@ -472,6 +549,66 @@ async function executeAction() {
         console.error('💥 Stack trace:', error.stack);
         alert('❌ Erreur lors de l\'exécution: ' + error.message);
         updateStatus('❌ Erreur d\'exécution');
+    }
+}
+
+async function createQualification() {
+    if (!selectedEnterprise) {
+        showMessage('Veuillez sélectionner une entreprise');
+        return;
+    }
+
+    // Récupération des données du formulaire
+    const formatEncart = document.getElementById('formatEncart').value;
+    const moisParution = document.getElementById('moisParution').value;
+    const modePaiement = document.getElementById('modePaiement').value;
+    const interlocuteur = document.getElementById('interlocuteur').value;
+    const emailContact = document.getElementById('emailContact').value;
+    const commentaires = document.getElementById('commentaires').value;
+
+    updateStatus('🎯 Création qualification...');
+
+    try {
+        const response = await fetch(N8N_WEBHOOKS.GATEWAY_ENTITIES, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                action: 'qualification',
+                data: {
+                    enterprise_id: selectedEnterprise.id,
+                    enterprise_name: selectedEnterprise.name,
+                    format_encart: formatEncart,
+                    mois_parution: moisParution,
+                    mode_paiement: modePaiement,
+                    interlocuteur: interlocuteur || null,
+                    email_contact: emailContact || null,
+                    commentaires: commentaires || null,
+                    user_id: user.id
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`HTTP error! status: ${response.status}, body: ${errorText}`);
+        }
+
+        const result = await response.json();
+        
+        if (result.success === false) {
+            throw new Error(result.error?.message || 'Erreur création qualification');
+        }
+        
+        showMessage(`✅ Qualification créée avec succès!`);
+        updateStatus('✅ Qualification créée');
+        showMainMenu();
+        
+    } catch (error) {
+        console.error('❌ Erreur création qualification:', error);
+        showMessage(`❌ Erreur: ${error.message}`);
+        updateStatus('❌ Erreur création qualification');
     }
 }
 
