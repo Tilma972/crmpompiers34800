@@ -155,6 +155,13 @@ function getStateContent(actionType) {
                 </div>
                 <div id="enterpriseResults" class="search-results"></div>
                 
+                <!-- 🆕 INDICATEUR AUTO-REMPLISSAGE -->
+                <div id="autoFillStatus" class="auto-fill-status" style="display: none;">
+                    <div style="background: #d1ecf1; padding: 8px; border-radius: 6px; margin: 10px 0; font-size: 12px;">
+                        🤖 <strong>Auto-remplissage activé</strong> - Les champs sont pré-remplis avec les données existantes
+                    </div>
+                </div>
+                
                 <div class="form-group">
                     <label class="form-label">Format encart :</label>
                     <select class="form-select" id="formatEncart">
@@ -434,6 +441,186 @@ function selectEnterpriseForAction(id, name) {
     document.getElementById('enterpriseResults').style.display = 'none';
     document.getElementById('executeBtn').disabled = false;
     updateStatus(`✅ ${name} sélectionnée`);
+    
+    // 🆕 NOUVEAU : Auto-remplissage intelligent
+    try {
+        autoFillEnterpriseData(id, name);
+    } catch (error) {
+        console.warn('Auto-remplissage échoué, continuant en mode manuel:', error);
+        // NE PAS bloquer l'interface si l'auto-remplissage échoue
+    }
+}
+
+// 🆕 NOUVELLE FONCTION : Auto-remplissage des données entreprise
+async function autoFillEnterpriseData(enterpriseId, enterpriseName) {
+    console.log('🔄 Auto-remplissage pour:', enterpriseName);
+    
+    try {
+        // Appel API pour récupérer les détails de l'entreprise
+        const response = await fetch(N8N_WEBHOOKS.ENTERPRISE_API, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                operation: 'get',
+                id: enterpriseId
+            })
+        });
+
+        if (!response.ok) {
+            console.warn('Impossible de récupérer les détails entreprise');
+            return;
+        }
+
+        const result = await response.json();
+        const enterprise = result.data;
+
+        if (!enterprise) {
+            console.warn('Pas de données entreprise trouvées');
+            return;
+        }
+
+        console.log('📊 Données entreprise récupérées:', enterprise);
+
+        // 🎯 AUTO-REMPLISSAGE selon l'action en cours
+        if (currentAction === 'qualification') {
+            autoFillQualificationForm(enterprise);
+        } else if (currentAction === 'formulaire') {
+            autoFillFormulaireForm(enterprise);
+        }
+
+    } catch (error) {
+        console.error('Erreur auto-remplissage:', error);
+        // Continuer sans auto-remplissage en cas d'erreur
+    }
+}
+
+// 🎯 Auto-remplissage formulaire QUALIFICATION
+function autoFillQualificationForm(enterprise) {
+    console.log('📝 Auto-remplissage qualification...');
+    
+    // 🔒 CHAMPS EN LECTURE SEULE (pré-remplis des données existantes)
+    const interlocuteurField = document.getElementById('interlocuteur');
+    const emailField = document.getElementById('emailContact');
+    
+    if (interlocuteurField && enterprise.interlocuteur) {
+        interlocuteurField.value = enterprise.interlocuteur;
+        interlocuteurField.setAttribute('readonly', true);
+        interlocuteurField.style.backgroundColor = '#f0f0f0';
+        interlocuteurField.style.color = '#666';
+        
+        // Ajouter un indicateur visuel
+        addReadOnlyIndicator(interlocuteurField, 'Données existantes');
+    }
+    
+    if (emailField && enterprise.email) {
+        emailField.value = enterprise.email;
+        emailField.setAttribute('readonly', true);
+        emailField.style.backgroundColor = '#f0f0f0';
+        emailField.style.color = '#666';
+        
+        addReadOnlyIndicator(emailField, 'Données existantes');
+    }
+    
+    // 🎯 PRÉ-SÉLECTION INTELLIGENTE (basée sur historique)
+    if (enterprise.format_encart_2025) {
+        const formatSelect = document.getElementById('formatEncart');
+        if (formatSelect) {
+            formatSelect.value = enterprise.format_encart_2025;
+            highlightPreSelected(formatSelect, 'Format utilisé en 2025');
+        }
+    }
+    
+    if (enterprise.mode_paiement_2024) {
+        const paiementSelect = document.getElementById('modePaiement');
+        if (paiementSelect) {
+            // Mapping des modes de paiement historiques
+            const modeMapping = {
+                'Cheque': 'Cheque',
+                'Chèque': 'Cheque', 
+                'Virement': 'Virement',
+                'Carte': 'Carte'
+            };
+            
+            const mappedMode = modeMapping[enterprise.mode_paiement_2024] || enterprise.mode_paiement_2024;
+            paiementSelect.value = mappedMode;
+            highlightPreSelected(paiementSelect, 'Mode utilisé en 2024');
+        }
+    }
+    
+    // 📝 COMMENTAIRE AUTOMATIQUE avec contexte
+    const commentairesField = document.getElementById('commentaires');
+    if (commentairesField && !commentairesField.value) {
+        const autoComment = generateAutoComment(enterprise);
+        commentairesField.value = autoComment;
+        commentairesField.style.fontStyle = 'italic';
+        commentairesField.style.color = '#666';
+    }
+    
+    console.log('✅ Qualification auto-remplie');
+    updateStatus(`📋 Formulaire pré-rempli avec données ${enterprise.nom_entreprise}`);
+}
+
+// 🏷️ Ajouter indicateur visuel champ en lecture seule
+function addReadOnlyIndicator(field, message) {
+    // Supprimer l'indicateur existant s'il y en a un
+    const existingIndicator = field.parentNode.querySelector('.readonly-indicator');
+    if (existingIndicator) {
+        existingIndicator.remove();
+    }
+    
+    // Créer nouvel indicateur
+    const indicator = document.createElement('div');
+    indicator.className = 'readonly-indicator';
+    indicator.innerHTML = `🔒 ${message}`;
+    indicator.style.cssText = `
+        font-size: 11px;
+        color: #666;
+        margin-top: 2px;
+        font-style: italic;
+    `;
+    
+    field.parentNode.appendChild(indicator);
+}
+
+// 🎯 Mettre en évidence champ pré-sélectionné
+function highlightPreSelected(field, message) {
+    field.style.border = '2px solid #fbbf24';
+    field.style.backgroundColor = '#fff3cd';
+    
+    // Ajouter message informatif
+    const indicator = document.createElement('div');
+    indicator.className = 'preselected-indicator';
+    indicator.innerHTML = `💡 ${message} - Vous pouvez modifier`;
+    indicator.style.cssText = `
+        font-size: 11px;
+        color: #856404;
+        margin-top: 2px;
+        font-style: italic;
+    `;
+    
+    field.parentNode.appendChild(indicator);
+}
+
+// 📝 Génération commentaire automatique intelligent
+function generateAutoComment(enterprise) {
+    const currentYear = new Date().getFullYear();
+    let comment = `Renouvellement ${currentYear} - `;
+    
+    if (enterprise.Client_2025 === 'Oui') {
+        comment += 'Client fidèle. ';
+    }
+    
+    if (enterprise.montant_payé_2024) {
+        comment += `Montant 2024: ${enterprise.montant_payé_2024}. `;
+    }
+    
+    if (enterprise.format_encart_2025) {
+        comment += `Format habituel: ${enterprise.format_encart_2025}. `;
+    }
+    
+    return comment.trim();
 }
 
 async function executeAction() {
