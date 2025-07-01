@@ -3,22 +3,11 @@ let tg = window.Telegram.WebApp;
 
 // Configuration des webhooks n8n
 const N8N_WEBHOOKS = {
-    // Agent CRM - Création et validation d'entreprises
     AGENT_CRM: 'https://n8n.dsolution-ia.fr/webhook/crm_agent',
-
-    // API Entreprises - Recherche et gestion des entreprises
     ENTERPRISE_API: 'https://n8n.dsolution-ia.fr/webhook/recherche_entreprise',
-
-    // 🆕 NOUVEAU : Gateway Entities pour actions déterministes
     GATEWAY_ENTITIES: 'https://n8n.dsolution-ia.fr/webhook/gateway_entities',
-
-    // PDF Generator - Génération de factures et bons de commande
     PDF_GENERATOR: 'https://n8n.dsolution-ia.fr/webhook/pdf_generator',
-
-    // Email Workflow - Envoi de formulaires et emails
     EMAIL_WORKFLOW: 'https://n8n.dsolution-ia.fr/webhook/email_workflow',
-
-    // Formulaire Entreprise - Workflows envoi de formulaire auto
     FORM_ENTREPRISE: 'https://n8n.dsolution-ia.fr/webhook/form_entreprise'
 };
 
@@ -36,9 +25,12 @@ let searchTimeout = null;
 const searchCache = {};
 let lastSearchQuery = null;
 
+// Variables pour système d'offres
+window.selectedOffer = null;
+window.qualificationData = null;
+
 // Alternative pour tg.showAlert compatible avec toutes les versions Telegram
 function showMessage(message) {
-    // Essayer d'abord tg.showAlert si disponible
     if (tg.showAlert && typeof tg.showAlert === 'function') {
         try {
             tg.showAlert(message);
@@ -48,11 +40,9 @@ function showMessage(message) {
         }
     }
 
-    // Fallback 1: updateStatus + console
     updateStatus(message);
     console.log('📱 Message:', message);
 
-    // Fallback 2: alert natif du navigateur si nécessaire
     if (message.includes('Erreur') || message.includes('❌')) {
         alert(message);
     }
@@ -68,7 +58,10 @@ const user = tg.initDataUnsafe?.user || {
 document.getElementById('userName').textContent = user.first_name;
 document.getElementById('userAvatar').textContent = user.first_name.charAt(0).toUpperCase();
 
-// Fonctions de navigation
+// ================================
+// 🧭 FONCTIONS DE NAVIGATION
+// ================================
+
 function showMainMenu() {
     currentState = 'main_menu';
     document.getElementById('mainMenu').classList.remove('hidden');
@@ -89,12 +82,10 @@ function showAction(actionType) {
     currentAction = actionType;
 
     if (actionType === 'intelligence') {
-        // Redirection vers Agent Orchestrateur
         callAgentOrchestrator('Analyse commerciale avancée demandée');
         return;
     }
 
-    // Actions déterministes
     currentState = 'action_' + actionType;
     document.getElementById('mainMenu').classList.add('hidden');
     showConversationState(actionType);
@@ -124,145 +115,185 @@ function getActionLabel(actionType) {
     return labels[actionType] || actionType;
 }
 
+// ================================
+// 🎨 GÉNÉRATION CONTENU FORMULAIRES
+// ================================
+
 function getStateContent(actionType) {
     switch (actionType) {
         case 'facture':
         case 'bon_commande':
         case 'formulaire':
-            return `
-                <div class="form-group">
-                    <label class="form-label">Entreprise concernée :</label>
-                    <input type="text" class="form-input" id="enterpriseInput" 
-                           placeholder="Tapez le nom de l'entreprise..."
-                           oninput="handleEnterpriseSearch(this.value)">
-                </div>
-                <div id="enterpriseResults" class="search-results"></div>
-                <div class="form-buttons">
-                    <button class="btn btn-secondary" onclick="showMainMenu()">Annuler</button>
-                    <button class="btn btn-primary" onclick="executeAction()" disabled id="executeBtn">
-                        Continuer
-                    </button>
-                </div>
-            `;
-
+            return getBasicActionContent();
+            
         case 'qualification':
-            return `
-                <div class="form-group">
-                    <label class="form-label">Entreprise concernée :</label>
-                    <input type="text" class="form-input" id="enterpriseInput" 
-                           placeholder="Tapez le nom de l'entreprise..."
-                           oninput="handleEnterpriseSearch(this.value)">
-                </div>
-                <div id="enterpriseResults" class="search-results"></div>
-                
-                <!-- 🆕 INDICATEUR AUTO-REMPLISSAGE -->
-                <div id="autoFillStatus" class="auto-fill-status" style="display: none;">
-                    <div style="background: #d1ecf1; padding: 8px; border-radius: 6px; margin: 10px 0; font-size: 12px;">
-                        🤖 <strong>Auto-remplissage activé</strong> - Les champs sont pré-remplis avec les données existantes
-                    </div>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Format encart :</label>
-                    <select class="form-select" id="formatEncart">
-                        <option value="6X4">6x4 (350€)</option>
-                        <option value="6X8">6x8 (500€)</option>
-                        <option value="12X4">12x4 (500€)</option>
-                        <option value="12PARUTIONS">12 parutions (1800€)</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Mois de parution :</label>
-                    <select class="form-select" id="moisParution">
-                        <option value="Janvier">Janvier</option>
-                        <option value="Février">Février</option>
-                        <option value="Mars">Mars</option>
-                        <option value="Avril">Avril</option>
-                        <option value="Mai">Mai</option>
-                        <option value="Juin">Juin</option>
-                        <option value="Juillet">Juillet</option>
-                        <option value="Août">Août</option>
-                        <option value="Septembre">Septembre</option>
-                        <option value="Octobre">Octobre</option>
-                        <option value="Novembre">Novembre</option>
-                        <option value="Décembre">Décembre</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Mode de paiement :</label>
-                    <select class="form-select" id="modePaiement">
-                        <option value="Virement">Virement bancaire</option>
-                        <option value="Cheque">Chèque</option>
-                        <option value="Carte">Carte bancaire</option>
-                        <option value="Especes">Espèces</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Contact (optionnel) :</label>
-                    <input type="text" class="form-input" id="interlocuteur" 
-                           placeholder="Nom du contact">
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Email contact (optionnel) :</label>
-                    <input type="email" class="form-input" id="emailContact" 
-                           placeholder="email@exemple.com">
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Commentaires (optionnel) :</label>
-                    <textarea class="form-input" id="commentaires" rows="3" 
-                              placeholder="Informations supplémentaires..."></textarea>
-                </div>
-                
-                <div class="form-buttons">
-                    <button class="btn btn-secondary" onclick="showMainMenu()">Annuler</button>
-                    <button class="btn btn-primary" onclick="createQualification()" disabled id="executeBtn">
-                        Créer Qualification
-                    </button>
-                </div>
-            `;
-
+            return getQualificationContent();
+            
         case 'nouvelle_entreprise':
-            return `
-                <div class="form-group">
-                    <label class="form-label">Nom de l'entreprise * :</label>
-                    <input type="text" class="form-input" id="nomEntreprise" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Commune :</label>
-                    <select class="form-select" id="communeSelect">
-                        <option value="">Sélectionner une commune...</option>
-                        <option value="2984030">CLERMONT-L'HÉRAULT</option>
-                        <option value="2984039">CABRIERES</option>
-                        <option value="2984034">BRIGNAC</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Contact :</label>
-                    <input type="text" class="form-input" id="contactNom">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Email :</label>
-                    <input type="email" class="form-input" id="emailContact">
-                </div>
-                <div class="form-buttons">
-                    <button class="btn btn-secondary" onclick="showMainMenu()">Annuler</button>
-                    <button class="btn btn-primary" onclick="createEnterprise()">
-                        🧠 Valider avec Agent CRM
-                    </button>
-                </div>
-            `;
-
+            return getNewEnterpriseContent();
+            
         default:
             return '<p>Fonctionnalité en développement...</p>';
     }
 }
 
-// Recherche temps réel
+function getBasicActionContent() {
+    return `
+        <div class="form-group">
+            <label class="form-label">Entreprise concernée :</label>
+            <input type="text" class="form-input" id="enterpriseInput" 
+                   placeholder="Tapez le nom de l'entreprise..."
+                   oninput="handleEnterpriseSearch(this.value)">
+        </div>
+        <div id="enterpriseResults" class="search-results"></div>
+        <div class="form-buttons">
+            <button class="btn btn-secondary" onclick="showMainMenu()">Annuler</button>
+            <button class="btn btn-primary" onclick="executeAction()" disabled id="executeBtn">
+                Continuer
+            </button>
+        </div>
+    `;
+}
+
+function getQualificationContent() {
+    return `
+        <div class="form-group">
+            <label class="form-label">Entreprise concernée :</label>
+            <input type="text" class="form-input" id="enterpriseInput" 
+                   placeholder="Tapez le nom de l'entreprise..."
+                   oninput="handleEnterpriseSearch(this.value)">
+        </div>
+        <div id="enterpriseResults" class="search-results"></div>
+        
+        <!-- 🆕 INDICATEUR AUTO-REMPLISSAGE -->
+        <div id="autoFillStatus" class="auto-fill-status" style="display: none;">
+            <div style="background: #d1ecf1; padding: 8px; border-radius: 6px; margin: 10px 0; font-size: 12px;">
+                🤖 <strong>Auto-remplissage activé</strong> - Les champs sont pré-remplis avec les données existantes
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Format encart :</label>
+            <select class="form-select" id="formatEncart">
+                <option value="6X4">6x4 (350€)</option>
+                <option value="6X8">6x8 (500€)</option>
+                <option value="12X4">12x4 (500€)</option>
+                <option value="12PARUTIONS">12 parutions (1800€)</option>
+            </select>
+        </div>
+        
+        <!-- 🆕 SECTION OFFRES INTELLIGENTES -->
+        <div id="smartOfferSection" style="display: none;">
+            <div class="form-group">
+                <label class="form-label">
+                    🎯 Offres intelligentes
+                    <button type="button" class="toggle-offers" onclick="toggleOfferMode()" style="margin-left: 10px; font-size: 11px;">
+                        Mode manuel
+                    </button>
+                </label>
+                <div id="offerOptions" class="offer-options">
+                    <!-- Options générées dynamiquement -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Nombre de parutions :</label>
+            <input type="number" class="form-input" id="nombreParutions" value="1" min="1" max="12">
+            <div class="price-display" id="priceDisplay">Prix total : 350€</div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Mois de parution :</label>
+            <select class="form-select" id="moisParution">
+                <option value="Janvier">Janvier</option>
+                <option value="Février">Février</option>
+                <option value="Mars">Mars</option>
+                <option value="Avril">Avril</option>
+                <option value="Mai">Mai</option>
+                <option value="Juin">Juin</option>
+                <option value="Juillet">Juillet</option>
+                <option value="Août">Août</option>
+                <option value="Septembre">Septembre</option>
+                <option value="Octobre">Octobre</option>
+                <option value="Novembre">Novembre</option>
+                <option value="Décembre">Décembre</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Mode de paiement :</label>
+            <select class="form-select" id="modePaiement">
+                <option value="Virement">Virement bancaire</option>
+                <option value="Cheque">Chèque</option>
+                <option value="Carte">Carte bancaire</option>
+                <option value="Especes">Espèces</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Contact :</label>
+            <input type="text" class="form-input" id="interlocuteur" 
+                   placeholder="Nom du contact">
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Email contact :</label>
+            <input type="email" class="form-input" id="emailContact" 
+                   placeholder="email@exemple.com">
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Commentaires :</label>
+            <textarea class="form-input" id="commentaires" rows="3" 
+                      placeholder="Informations supplémentaires..."></textarea>
+        </div>
+        
+        <div class="form-buttons">
+            <button class="btn btn-secondary" onclick="showMainMenu()">Annuler</button>
+            <button class="btn btn-primary" onclick="createQualification()" disabled id="executeBtn">
+                Créer Qualification
+            </button>
+        </div>
+    `;
+}
+
+function getNewEnterpriseContent() {
+    return `
+        <div class="form-group">
+            <label class="form-label">Nom de l'entreprise * :</label>
+            <input type="text" class="form-input" id="nomEntreprise" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Commune :</label>
+            <select class="form-select" id="communeSelect">
+                <option value="">Sélectionner une commune...</option>
+                <option value="2984030">CLERMONT-L'HÉRAULT</option>
+                <option value="2984039">CABRIERES</option>
+                <option value="2984034">BRIGNAC</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Contact :</label>
+            <input type="text" class="form-input" id="contactNom">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Email :</label>
+            <input type="email" class="form-input" id="emailContact">
+        </div>
+        <div class="form-buttons">
+            <button class="btn btn-secondary" onclick="showMainMenu()">Annuler</button>
+            <button class="btn btn-primary" onclick="createEnterprise()">
+                🧠 Valider avec Agent CRM
+            </button>
+        </div>
+    `;
+}
+
+// ================================
+// 🔍 FONCTIONS DE RECHERCHE
+// ================================
+
 function handleSearch(query) {
     clearTimeout(searchTimeout);
 
@@ -271,12 +302,10 @@ function handleSearch(query) {
         return;
     }
 
-    // Éviter les appels identiques consécutifs
     if (query === lastSearchQuery) {
         return;
     }
 
-    // Vérifier le cache
     if (searchCache[query]) {
         displaySearchResults(searchCache[query]);
         updateStatus(`${searchCache[query].length} résultat(s) trouvé(s) (cache)`);
@@ -300,12 +329,10 @@ function handleEnterpriseSearch(query) {
         return;
     }
 
-    // Éviter les appels identiques consécutifs
     if (query === lastSearchQuery) {
         return;
     }
 
-    // Vérifier le cache
     if (searchCache[query]) {
         displayEnterpriseResults(searchCache[query]);
         return;
@@ -319,7 +346,6 @@ function handleEnterpriseSearch(query) {
 
 async function searchEnterprises(query) {
     try {
-        // Appel à la nouvelle API Entreprises
         const response = await fetch(N8N_WEBHOOKS.ENTERPRISE_API, {
             method: 'POST',
             headers: {
@@ -339,9 +365,7 @@ async function searchEnterprises(query) {
         const data = await response.json();
         const enterprises = data.data || [];
 
-        // Mettre en cache le résultat
         searchCache[query] = enterprises;
-
         displaySearchResults(enterprises);
         updateStatus(`${enterprises.length} résultat(s) trouvé(s)`);
 
@@ -353,7 +377,6 @@ async function searchEnterprises(query) {
 
 async function searchEnterprisesForAction(query) {
     try {
-        // Appel à la nouvelle API Entreprises pour les actions
         const response = await fetch(N8N_WEBHOOKS.ENTERPRISE_API, {
             method: 'POST',
             headers: {
@@ -373,9 +396,7 @@ async function searchEnterprisesForAction(query) {
         const data = await response.json();
         const enterprises = data.data || [];
 
-        // Mettre en cache le résultat
         searchCache[query] = enterprises;
-
         displayEnterpriseResults(enterprises);
 
     } catch (error) {
@@ -383,6 +404,10 @@ async function searchEnterprisesForAction(query) {
         displayEnterpriseResults([]);
     }
 }
+
+// ================================
+// 🎨 AFFICHAGE RÉSULTATS
+// ================================
 
 function displaySearchResults(results) {
     const resultsDiv = document.getElementById('searchResults');
@@ -424,11 +449,13 @@ function displayEnterpriseResults(results) {
     resultsDiv.style.display = 'block';
 }
 
+// ================================
+// ✅ SÉLECTION ENTREPRISES
+// ================================
+
 function selectEnterprise(id, name) {
     selectedEnterprise = { id, name };
     updateStatus(`Entreprise sélectionnée: ${name}`);
-
-    // Afficher détails entreprise ou actions possibles
     showMessage(`Entreprise sélectionnée: ${name}`);
 }
 
@@ -447,16 +474,17 @@ function selectEnterpriseForAction(id, name) {
         autoFillEnterpriseData(id, name);
     } catch (error) {
         console.warn('Auto-remplissage échoué, continuant en mode manuel:', error);
-        // NE PAS bloquer l'interface si l'auto-remplissage échoue
     }
 }
 
-// 🆕 NOUVELLE FONCTION : Auto-remplissage des données entreprise
+// ================================
+// 🤖 AUTO-REMPLISSAGE INTELLIGENT
+// ================================
+
 async function autoFillEnterpriseData(enterpriseId, enterpriseName) {
     console.log('🔄 Auto-remplissage pour:', enterpriseName);
     
     try {
-        // Appel API pour récupérer les détails de l'entreprise
         const response = await fetch(N8N_WEBHOOKS.ENTERPRISE_API, {
             method: 'POST',
             headers: {
@@ -492,15 +520,16 @@ async function autoFillEnterpriseData(enterpriseId, enterpriseName) {
 
     } catch (error) {
         console.error('Erreur auto-remplissage:', error);
-        // Continuer sans auto-remplissage en cas d'erreur
     }
 }
 
-// 🎯 Auto-remplissage formulaire QUALIFICATION
 function autoFillQualificationForm(enterprise) {
     console.log('📝 Auto-remplissage qualification...');
     
-    // 🔒 CHAMPS EN LECTURE SEULE (pré-remplis des données existantes)
+    // Afficher l'indicateur d'auto-remplissage
+    showAutoFillStatus('Formulaire pré-rempli avec les données existantes');
+    
+    // 🔒 CHAMPS EN LECTURE SEULE
     const interlocuteurField = document.getElementById('interlocuteur');
     const emailField = document.getElementById('emailContact');
     
@@ -509,8 +538,6 @@ function autoFillQualificationForm(enterprise) {
         interlocuteurField.setAttribute('readonly', true);
         interlocuteurField.style.backgroundColor = '#f0f0f0';
         interlocuteurField.style.color = '#666';
-        
-        // Ajouter un indicateur visuel
         addReadOnlyIndicator(interlocuteurField, 'Données existantes');
     }
     
@@ -519,23 +546,27 @@ function autoFillQualificationForm(enterprise) {
         emailField.setAttribute('readonly', true);
         emailField.style.backgroundColor = '#f0f0f0';
         emailField.style.color = '#666';
-        
         addReadOnlyIndicator(emailField, 'Données existantes');
     }
     
-    // 🎯 PRÉ-SÉLECTION INTELLIGENTE (basée sur historique)
+    // 🎯 PRÉ-SÉLECTION INTELLIGENTE
     if (enterprise.format_encart_2025) {
         const formatSelect = document.getElementById('formatEncart');
         if (formatSelect) {
             formatSelect.value = enterprise.format_encart_2025;
             highlightPreSelected(formatSelect, 'Format utilisé en 2025');
+            
+            // Event listener pour mise à jour des offres
+            formatSelect.addEventListener('change', function() {
+                updateOfferOptions(enterprise, this.value);
+                updateManualPrice();
+            });
         }
     }
     
     if (enterprise.mode_paiement_2024) {
         const paiementSelect = document.getElementById('modePaiement');
         if (paiementSelect) {
-            // Mapping des modes de paiement historiques
             const modeMapping = {
                 'Cheque': 'Cheque',
                 'Chèque': 'Cheque', 
@@ -549,7 +580,7 @@ function autoFillQualificationForm(enterprise) {
         }
     }
     
-    // 📝 COMMENTAIRE AUTOMATIQUE avec contexte
+    // 📝 COMMENTAIRE AUTOMATIQUE
     const commentairesField = document.getElementById('commentaires');
     if (commentairesField && !commentairesField.value) {
         const autoComment = generateAutoComment(enterprise);
@@ -558,11 +589,302 @@ function autoFillQualificationForm(enterprise) {
         commentairesField.style.color = '#666';
     }
     
+    // 🎯 SYSTÈME D'OFFRES INTELLIGENTES
+    initializeSmartOffers(enterprise);
+    
     console.log('✅ Qualification auto-remplie');
     updateStatus(`📋 Formulaire pré-rempli avec données ${enterprise.nom_entreprise}`);
 }
 
-// 🏷️ Ajouter indicateur visuel champ en lecture seule
+// ================================
+// 🎁 SYSTÈME D'OFFRES INTELLIGENTES
+// ================================
+
+function initializeSmartOffers(enterprise) {
+    // Afficher la section offres
+    const smartOfferSection = document.getElementById('smartOfferSection');
+    if (smartOfferSection) {
+        smartOfferSection.style.display = 'block';
+    }
+    
+    // Initialiser avec le format actuel
+    const formatSelect = document.getElementById('formatEncart');
+    const selectedFormat = formatSelect ? formatSelect.value : '6X4';
+    
+    updateOfferOptions(enterprise, selectedFormat);
+    
+    // Event listener pour nombre de parutions manuel
+    const nombreInput = document.getElementById('nombreParutions');
+    if (nombreInput) {
+        nombreInput.addEventListener('input', function() {
+            updateManualPrice();
+        });
+    }
+}
+
+function updateOfferOptions(enterprise, selectedFormat) {
+    const offers = calculateSmartOffer(enterprise, selectedFormat);
+    const optionsDiv = document.getElementById('offerOptions');
+    const nombreInput = document.getElementById('nombreParutions');
+    const priceDisplay = document.getElementById('priceDisplay');
+    
+    if (!optionsDiv) return;
+    
+    let optionsHTML = '';
+    
+    // Option de base
+    optionsHTML += createOfferOption('base', offers.base, true);
+    
+    // Offre suggérée si disponible
+    if (offers.suggested) {
+        optionsHTML += createOfferOption('suggested', offers.suggested, false);
+    }
+    
+    optionsDiv.innerHTML = optionsHTML;
+    
+    // Mise à jour automatique des champs
+    if (nombreInput) nombreInput.value = offers.base.nombre_parutions;
+    if (priceDisplay) priceDisplay.textContent = `Prix total : ${offers.base.prix_total}€`;
+    
+    // Event listeners pour sélection d'offre
+    optionsDiv.querySelectorAll('.offer-option').forEach(option => {
+        option.addEventListener('click', function() {
+            selectOffer(this.dataset.offerType, offers);
+        });
+    });
+    
+    // Stocker l'offre par défaut
+    window.selectedOffer = offers.base;
+}
+
+function calculateSmartOffer(enterprise, selectedFormat) {
+    console.log('🧠 Calcul offre intelligente pour:', enterprise.nom_entreprise);
+    
+    const offers = {
+        base: {
+            nombre_parutions: 1,
+            prix_unitaire: getBasePriceByFormat(selectedFormat),
+            prix_total: getBasePriceByFormat(selectedFormat),
+            offre_type: 'standard'
+        },
+        suggested: null
+    };
+    
+    // 📊 ANALYSE HISTORIQUE CLIENT
+    const clientHistory = analyzeClientHistory(enterprise);
+    
+    // 🎯 RÈGLES D'OFFRE INTELLIGENTE
+    if (selectedFormat === '12PARUTIONS') {
+        // Format annuel = offre automatique
+        offers.base = {
+            nombre_parutions: 12,
+            prix_unitaire: 150, // 1800/12
+            prix_total: 1800,
+            offre_type: 'annuelle',
+            discount: 'Tarif préférentiel annuel'
+        };
+    } else if (clientHistory.is_loyal && selectedFormat !== '6X4') {
+        // Client fidèle + format premium = offre possible
+        offers.suggested = calculateLoyaltyOffer(selectedFormat, clientHistory);
+    } else if (clientHistory.previous_multi_parution) {
+        // Historique multi-parution = offre multi
+        offers.suggested = calculateMultiParutionOffer(selectedFormat, clientHistory);
+    }
+    
+    return offers;
+}
+
+function analyzeClientHistory(enterprise) {
+    const history = {
+        is_loyal: false,
+        previous_multi_parution: false,
+        years_client: 0,
+        total_amount_paid: 0,
+        preferred_format: null,
+        payment_reliability: 'unknown'
+    };
+    
+    // Client 2025 = fidèle
+    if (enterprise.Client_2025 === 'Oui') {
+        history.is_loyal = true;
+        history.years_client = 1;
+    }
+    
+    // Montant historique
+    if (enterprise.montant_payé_2024) {
+        const amount = parseFloat(enterprise.montant_payé_2024.replace(/[€,]/g, ''));
+        history.total_amount_paid = amount;
+        
+        // Si montant > prix standard = multi-parution probable
+        if (amount > 500) {
+            history.previous_multi_parution = true;
+        }
+    }
+    
+    // Format préféré
+    history.preferred_format = enterprise.format_encart_2025 || '6X4';
+    
+    // Fiabilité paiement
+    if (enterprise.montant_payé_2024) {
+        history.payment_reliability = 'good';
+    }
+    
+    console.log('📊 Historique client analysé:', history);
+    return history;
+}
+
+function calculateLoyaltyOffer(format, history) {
+    const basePrice = getBasePriceByFormat(format);
+    
+    return {
+        nombre_parutions: 3,
+        prix_unitaire: Math.round(basePrice * 0.85), // 15% de remise
+        prix_total: Math.round(basePrice * 0.85 * 3),
+        offre_type: 'fidelite',
+        discount: '15% remise fidélité',
+        description: `Offre fidélité : 3 parutions ${format} avec 15% de remise`,
+        savings: Math.round(basePrice * 3 * 0.15)
+    };
+}
+
+function calculateMultiParutionOffer(format, history) {
+    const basePrice = getBasePriceByFormat(format);
+    
+    let suggestedParutions = 2;
+    if (history.total_amount_paid > 800) {
+        suggestedParutions = 6; // Semestre
+    } else if (history.total_amount_paid > 1200) {
+        suggestedParutions = 12; // Année
+    }
+    
+    return {
+        nombre_parutions: suggestedParutions,
+        prix_unitaire: Math.round(basePrice * (1 - (suggestedParutions * 0.02))),
+        prix_total: Math.round(basePrice * suggestedParutions * (1 - (suggestedParutions * 0.02))),
+        offre_type: 'multi_parution',
+        discount: `${suggestedParutions * 2}% remise multi-parution`,
+        description: `${suggestedParutions} parutions ${format} avec remise progressive`,
+        savings: Math.round(basePrice * suggestedParutions * (suggestedParutions * 0.02))
+    };
+}
+
+function getBasePriceByFormat(format) {
+    const prices = {
+        '6X4': 350,
+        '6X8': 500,
+        '12X4': 500,
+        '12PARUTIONS': 1800
+    };
+    return prices[format] || 350;
+}
+
+function createOfferOption(type, offer, selected) {
+    const selectedClass = selected ? 'selected' : '';
+    const savings = offer.savings ? `<span class="savings">Économie: ${offer.savings}€</span>` : '';
+    
+    return `
+        <div class="offer-option ${selectedClass}" data-offer-type="${type}">
+            <div class="offer-header">
+                <strong>${offer.nombre_parutions} parution(s)</strong>
+                <span class="offer-price">${offer.prix_total}€</span>
+            </div>
+            <div class="offer-details">
+                ${offer.prix_unitaire}€/parution • ${offer.offre_type}
+                ${offer.discount ? `<br><em>${offer.discount}</em>` : ''}
+                ${savings}
+            </div>
+        </div>
+    `;
+}
+
+function selectOffer(offerType, offers) {
+    const selectedOffer = offers[offerType];
+    
+    // Mettre à jour l'interface
+    const nombreInput = document.getElementById('nombreParutions');
+    const priceDisplay = document.getElementById('priceDisplay');
+    
+    if (nombreInput) nombreInput.value = selectedOffer.nombre_parutions;
+    if (priceDisplay) priceDisplay.textContent = `Prix total : ${selectedOffer.prix_total}€`;
+    
+    // Mettre à jour sélection visuelle
+    document.querySelectorAll('.offer-option').forEach(opt => opt.classList.remove('selected'));
+    const targetOption = document.querySelector(`[data-offer-type="${offerType}"]`);
+    if (targetOption) targetOption.classList.add('selected');
+    
+    // Stocker l'offre sélectionnée
+    window.selectedOffer = selectedOffer;
+    
+    console.log('✅ Offre sélectionnée:', selectedOffer);
+}
+
+function toggleOfferMode() {
+    const button = document.querySelector('.toggle-offers');
+    const offerOptions = document.getElementById('offerOptions');
+    const nombreInput = document.getElementById('nombreParutions');
+    
+    if (!button || !offerOptions || !nombreInput) return;
+    
+    if (button.textContent === 'Mode manuel') {
+        // Passer en mode manuel
+        button.textContent = 'Mode offres';
+        offerOptions.style.display = 'none';
+        nombreInput.removeAttribute('readonly');
+        nombreInput.style.backgroundColor = 'white';
+        
+        // Event listener pour calcul manuel
+        nombreInput.addEventListener('input', function() {
+            updateManualPrice();
+        });
+        
+    } else {
+        // Retour mode offres
+        button.textContent = 'Mode manuel';
+        offerOptions.style.display = 'block';
+        nombreInput.setAttribute('readonly', true);
+        nombreInput.style.backgroundColor = '#f0f0f0';
+    }
+}
+
+function updateManualPrice() {
+    const formatSelect = document.getElementById('formatEncart');
+    const nombreInput = document.getElementById('nombreParutions');
+    const priceDisplay = document.getElementById('priceDisplay');
+    
+    if (!formatSelect || !nombreInput || !priceDisplay) return;
+    
+    const format = formatSelect.value;
+    const nombre = parseInt(nombreInput.value) || 1;
+    const prixUnitaire = getBasePriceByFormat(format);
+    const prixTotal = prixUnitaire * nombre;
+    
+    priceDisplay.textContent = `Prix total : ${prixTotal}€`;
+    
+    // Stocker l'offre manuelle
+    window.selectedOffer = {
+        nombre_parutions: nombre,
+        prix_unitaire: prixUnitaire,
+        prix_total: prixTotal,
+        offre_type: 'manuelle'
+    };
+}
+
+// ================================
+// 🎨 FONCTIONS UTILITAIRES UI
+// ================================
+
+function showAutoFillStatus(message) {
+    const statusDiv = document.getElementById('autoFillStatus');
+    if (statusDiv) {
+        statusDiv.style.display = 'block';
+        statusDiv.innerHTML = `
+            <div style="background: #d1ecf1; padding: 8px; border-radius: 6px; margin: 10px 0; font-size: 12px;">
+                🤖 <strong>${message}</strong>
+            </div>
+        `;
+    }
+}
+
 function addReadOnlyIndicator(field, message) {
     // Supprimer l'indicateur existant s'il y en a un
     const existingIndicator = field.parentNode.querySelector('.readonly-indicator');
@@ -584,7 +906,6 @@ function addReadOnlyIndicator(field, message) {
     field.parentNode.appendChild(indicator);
 }
 
-// 🎯 Mettre en évidence champ pré-sélectionné
 function highlightPreSelected(field, message) {
     field.style.border = '2px solid #fbbf24';
     field.style.backgroundColor = '#fff3cd';
@@ -603,7 +924,6 @@ function highlightPreSelected(field, message) {
     field.parentNode.appendChild(indicator);
 }
 
-// 📝 Génération commentaire automatique intelligent
 function generateAutoComment(enterprise) {
     const currentYear = new Date().getFullYear();
     let comment = `Renouvellement ${currentYear} - `;
@@ -623,44 +943,18 @@ function generateAutoComment(enterprise) {
     return comment.trim();
 }
 
+// ================================
+// ⚡ EXÉCUTION ACTIONS
+// ================================
+
 async function executeAction() {
-    // === DEBUG COMPLET ===
     console.log('🔍 === DIAGNOSTIC EXECUTE ACTION ===');
     console.log('1. selectedEnterprise:', selectedEnterprise);
     console.log('2. currentAction:', currentAction);
-    console.log('3. currentState:', currentState);
-    console.log('4. executeBtn disabled:', document.getElementById('executeBtn')?.disabled);
-    console.log('5. Valeur input entreprise:', document.getElementById('enterpriseInput')?.value);
 
-    // Vérifier selectedEnterprise en détail
-    if (selectedEnterprise) {
-        console.log('✅ selectedEnterprise existe');
-        console.log('   - ID:', selectedEnterprise.id);
-        console.log('   - Name:', selectedEnterprise.name);
-    } else {
-        console.error('❌ selectedEnterprise est NULL ou UNDEFINED');
-        console.log('   - Type:', typeof selectedEnterprise);
-        console.log('   - Valeur exacte:', selectedEnterprise);
-    }
-
-    // Vérifier currentAction en détail
-    if (currentAction) {
-        console.log('✅ currentAction existe:', currentAction);
-    } else {
-        console.error('❌ currentAction est NULL ou UNDEFINED');
-        console.log('   - Type:', typeof currentAction);
-        console.log('   - Valeur exacte:', currentAction);
-    }
-
-    console.log('========================================');
-
-    // Test de validation original
     if (!selectedEnterprise || !currentAction) {
-        console.error('🚨 VALIDATION ÉCHEC - Détails:');
-        console.error('   - selectedEnterprise falsy?', !selectedEnterprise);
-        console.error('   - currentAction falsy?', !currentAction);
-
-        // Affichage d'erreur personnalisé selon le cas
+        console.error('🚨 VALIDATION ÉCHEC');
+        
         if (!selectedEnterprise && !currentAction) {
             updateStatus('❌ Entreprise ET action manquantes');
             alert('DEBUG: Entreprise ET action manquantes');
@@ -678,24 +972,18 @@ async function executeAction() {
     updateStatus('⚡ Exécution en cours...');
 
     try {
-        // Sélection du bon webhook selon l'action
         let webhookUrl;
         switch (currentAction) {
             case 'facture':
             case 'bon_commande':
                 webhookUrl = N8N_WEBHOOKS.PDF_GENERATOR;
-                console.log('🔗 Webhook PDF_GENERATOR sélectionné');
                 break;
             case 'formulaire':
                 webhookUrl = N8N_WEBHOOKS.FORM_ENTREPRISE;
-                console.log('🔗 Webhook FORM_ENTREPRISE sélectionné');
                 break;
             default:
                 webhookUrl = N8N_WEBHOOKS.AGENT_CRM;
-                console.log('🔗 Webhook AGENT_CRM par défaut');
         }
-
-        console.log('🌐 URL webhook:', webhookUrl);
 
         const payload = {
             action: currentAction,
@@ -706,10 +994,6 @@ async function executeAction() {
             }
         };
 
-        console.log('📦 Payload à envoyer:', JSON.stringify(payload, null, 2));
-
-        // Appel webhook n8n avec payload standardisé
-        console.log('🚀 Envoi requête vers n8n...');
         const response = await fetch(webhookUrl, {
             method: 'POST',
             headers: {
@@ -718,14 +1002,11 @@ async function executeAction() {
             body: JSON.stringify(payload)
         });
 
-        console.log('📡 Réponse reçue - Status:', response.status);
-
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
         const result = await response.json();
-        console.log('✅ Résultat n8n:', result);
 
         updateStatus('✅ Action terminée');
         alert(`✅ ${getActionLabel(currentAction)} exécutée avec succès!`);
@@ -733,7 +1014,6 @@ async function executeAction() {
 
     } catch (error) {
         console.error('💥 Erreur complète:', error);
-        console.error('💥 Stack trace:', error.stack);
         alert('❌ Erreur lors de l\'exécution: ' + error.message);
         updateStatus('❌ Erreur d\'exécution');
     }
@@ -752,29 +1032,40 @@ async function createQualification() {
     const interlocuteur = document.getElementById('interlocuteur').value;
     const emailContact = document.getElementById('emailContact').value;
     const commentaires = document.getElementById('commentaires').value;
+    
+    // 🆕 RÉCUPÉRATION DONNÉES OFFRE SÉLECTIONNÉE
+    const nombreParutions = document.getElementById('nombreParutions').value;
+    const selectedOffer = window.selectedOffer;
 
     updateStatus('🎯 Création qualification...');
 
     try {
+        const qualificationData = {
+            action: 'qualification',
+            data: {
+                enterprise_id: selectedEnterprise.id,
+                enterprise_name: selectedEnterprise.name,
+                format_encart: formatEncart,
+                mois_parution: moisParution,
+                mode_paiement: modePaiement,
+                interlocuteur: interlocuteur || null,
+                email_contact: emailContact || null,
+                commentaires: commentaires || null,
+                nombre_parutions: nombreParutions,
+                // 🆕 DONNÉES OFFRE INTELLIGENTE
+                offre_type: selectedOffer?.offre_type || 'standard',
+                prix_unitaire: selectedOffer?.prix_unitaire || getBasePriceByFormat(formatEncart),
+                prix_total: selectedOffer?.prix_total || (getBasePriceByFormat(formatEncart) * parseInt(nombreParutions)),
+                user_id: user.id
+            }
+        };
+
         const response = await fetch(N8N_WEBHOOKS.GATEWAY_ENTITIES, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                action: 'qualification',
-                data: {
-                    enterprise_id: selectedEnterprise.id,
-                    enterprise_name: selectedEnterprise.name,
-                    format_encart: formatEncart,
-                    mois_parution: moisParution,
-                    mode_paiement: modePaiement,
-                    interlocuteur: interlocuteur || null,
-                    email_contact: emailContact || null,
-                    commentaires: commentaires || null,
-                    user_id: user.id
-                }
-            })
+            body: JSON.stringify(qualificationData)
         });
 
         if (!response.ok) {
@@ -788,9 +1079,16 @@ async function createQualification() {
             throw new Error(result.error?.message || 'Erreur création qualification');
         }
         
-        showMessage(`✅ Qualification créée avec succès!`);
-        updateStatus('✅ Qualification créée');
-        showMainMenu();
+        // 🆕 NOUVEAU : Proposer génération de documents
+        if (result.success && result.next_steps) {
+            setTimeout(() => {
+                showDocumentChoiceDialog(result);
+            }, 1000);
+        } else {
+            showMessage(`✅ Qualification créée avec succès!`);
+            updateStatus('✅ Qualification créée');
+            showMainMenu();
+        }
         
     } catch (error) {
         console.error('❌ Erreur création qualification:', error);
@@ -798,6 +1096,98 @@ async function createQualification() {
         updateStatus('❌ Erreur création qualification');
     }
 }
+
+// ================================
+// 📄 CHOIX DE DOCUMENT POST-QUALIFICATION
+// ================================
+
+function showDocumentChoiceDialog(qualificationResult) {
+    const data = qualificationResult.data;
+    const nextSteps = qualificationResult.next_steps;
+    
+    // Créer dialog personnalisé
+    const dialogHTML = `
+        <div class="choice-dialog">
+            <div class="choice-title">
+                🎯 Qualification "${data.qualification_ref}" créée !
+                <br><small>Client: ${data.interlocuteur} - ${data.prix_total}</small>
+            </div>
+            
+            <div class="choice-subtitle">Quelle action souhaitez-vous effectuer ?</div>
+            
+            <div class="choice-buttons">
+                <button class="choice-btn choice-facture" onclick="generateDocument('facture', qualificationData)">
+                    ${nextSteps.facture.label}
+                    <small>${nextSteps.facture.description}</small>
+                </button>
+                
+                <button class="choice-btn choice-commande" onclick="generateDocument('bon_commande', qualificationData)">
+                    ${nextSteps.bon_commande.label}
+                    <small>${nextSteps.bon_commande.description}</small>
+                </button>
+                
+                <button class="choice-btn choice-later" onclick="closeDocumentDialog()">
+                    ⏰ Plus tard
+                    <small>Retour au menu principal</small>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Stocker les données pour utilisation ultérieure
+    window.qualificationData = qualificationResult;
+    
+    // Afficher le dialog
+    document.getElementById('stateTitle').innerHTML = 'Choix du document';
+    document.getElementById('stateContent').innerHTML = dialogHTML;
+    document.getElementById('conversationState').style.display = 'block';
+    document.getElementById('mainMenu').classList.add('hidden');
+}
+
+async function generateDocument(documentType, qualificationResult) {
+    const autoData = qualificationResult.next_steps[documentType].auto_data;
+    
+    updateStatus(`🔄 Génération ${documentType}...`);
+    
+    try {
+        const response = await fetch(N8N_WEBHOOKS.PDF_GENERATOR, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                query: JSON.stringify(autoData)
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        showMessage(`✅ ${documentType.toUpperCase()} généré avec succès !`);
+        updateStatus(`✅ Document prêt`);
+        
+        setTimeout(() => {
+            closeDocumentDialog();
+        }, 2000);
+        
+    } catch (error) {
+        console.error('Erreur génération document:', error);
+        showMessage(`❌ Erreur génération ${documentType}`);
+    }
+}
+
+function closeDocumentDialog() {
+    document.getElementById('conversationState').style.display = 'none';
+    window.qualificationData = null;
+    showMainMenu();
+}
+
+// ================================
+// 🏢 CRÉATION ENTREPRISE
+// ================================
 
 async function createEnterprise() {
     const nom = document.getElementById('nomEntreprise').value;
@@ -813,7 +1203,6 @@ async function createEnterprise() {
     updateStatus('🧠 Validation Agent CRM...');
 
     try {
-        // Appel Agent CRM pour validation et création
         const response = await fetch(N8N_WEBHOOKS.AGENT_CRM, {
             method: 'POST',
             headers: {
@@ -848,11 +1237,14 @@ async function createEnterprise() {
     }
 }
 
+// ================================
+// 🤖 AGENT ORCHESTRATEUR
+// ================================
+
 async function callAgentOrchestrator(request) {
     updateStatus('🧠 Agent Orchestrateur activé...');
 
     try {
-        // Appel direct à l'Agent CRM (orchestrateur intégré)
         const response = await fetch(N8N_WEBHOOKS.AGENT_CRM, {
             method: 'POST',
             headers: {
@@ -887,9 +1279,17 @@ async function callAgentOrchestrator(request) {
     }
 }
 
+// ================================
+// 🎨 FONCTION UTILITAIRE
+// ================================
+
 function updateStatus(message) {
     document.getElementById('statusText').textContent = message;
 }
+
+// ================================
+// 🚀 INITIALISATION
+// ================================
 
 // Gestion des boutons Telegram
 tg.MainButton.setText('Fermer l\'app');
@@ -899,5 +1299,5 @@ tg.MainButton.onClick(() => {
 tg.MainButton.show();
 
 // Initialisation
-console.log('🚒 CRM Mini App initialisée');
+console.log('🚒 CRM Mini App initialisée avec auto-remplissage intelligent');
 updateStatus('🟢 Application prête');
