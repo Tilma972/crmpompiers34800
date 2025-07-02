@@ -1567,43 +1567,6 @@ function showCreateQualificationFirst(documentType) {
     document.getElementById('conversationState').style.display = 'block';
 }
 
-async function confirmGenerateDocument(documentType) {
-    const qualData = window.currentQualificationData;
-    
-    // Récupérer les valeurs du dialog (en cas de modification)
-    const finalData = {
-        action: documentType,
-        data: {
-            enterprise_id: selectedEnterprise.id,
-            enterprise_name: selectedEnterprise.name,
-            format_encart: document.getElementById('validationFormat').value,
-            mois_parution: qualData.mois_parution,
-            mode_paiement: qualData.mode_paiement?.value || qualData.mode_paiement,
-            interlocuteur: document.getElementById('validationInterlocuteur').value,
-            email_contact: qualData.email_contact,
-            prix_total: qualData.prix_total,
-            qualification_id: qualData.id, // Référence qualification source
-            user_id: user.id
-        }
-    };
-    
-    // ENVOI AU GATEWAY ENTITIES
-    try {
-        const response = await fetch(N8N_WEBHOOKS.GATEWAY_ENTITIES, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(finalData)
-        });
-        
-        const result = await response.json();
-        showMessage(`✅ ${documentType.toUpperCase()} généré avec succès !`);
-        showMainMenu();
-        
-    } catch (error) {
-        showMessage(`❌ Erreur génération ${documentType}`);
-    }
-}
-
 function editQualificationFirst() {
     // Rediriger vers l'édition de qualification
     currentAction = 'qualification';
