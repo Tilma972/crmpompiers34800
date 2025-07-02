@@ -408,36 +408,65 @@ async function searchEnterprisesForAction(query) {
 
 async function searchQualificationForEnterprise(enterpriseId) {
     try {
+        console.log('🚀 Début recherche qualification pour enterprise_id:', enterpriseId);
+        
+        const payload = {
+            enterprise_id: enterpriseId
+        };
+        console.log('📤 Payload envoyé:', JSON.stringify(payload));
+        
         const response = await fetch(N8N_WEBHOOKS.QUALIFICATION_API, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                enterprise_id: enterpriseId
-            })
+            body: JSON.stringify(payload)
         });
 
+        console.log('📡 Response status:', response.status);
+        console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+        
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const result = await response.json();
+        // 🔍 DEBUG: Lire la réponse comme texte d'abord
+        const responseText = await response.text();
+        console.log('📝 Response text brut:', responseText);
+        console.log('📝 Response text length:', responseText.length);
         
-        // ✅ CORRECTION : result est maintenant directement le tableau
+        // Puis parser en JSON
+        let result;
+        try {
+            result = JSON.parse(responseText);
+            console.log('✅ JSON parsing réussi');
+        } catch (parseError) {
+            console.error('❌ Erreur parsing JSON:', parseError);
+            console.log('🔍 Premiers 200 caractères:', responseText.substring(0, 200));
+            return null;
+        }
+        
         console.log('🔍 Réponse API qualification:', result);
-        console.log('🔍 Type de réponse:', typeof result, 'Array?', Array.isArray(result));
+        console.log('🔍 Type de réponse:', typeof result);
+        console.log('🔍 Est-ce un tableau?', Array.isArray(result));
         
-        if (Array.isArray(result) && result.length > 0) {
-            console.log('✅ Qualification trouvée:', result[0]);
-            return result[0];
+        if (Array.isArray(result)) {
+            console.log('🔍 Longueur du tableau:', result.length);
+            if (result.length > 0) {
+                console.log('✅ Qualification trouvée:', result[0]);
+                return result[0];
+            } else {
+                console.log('❌ Tableau vide - Aucune qualification');
+                return null;
+            }
         } else {
-            console.log('❌ Aucune qualification trouvée pour enterprise_id:', enterpriseId);
+            console.log('❌ La réponse n\'est pas un tableau:', result);
             return null;
         }
 
     } catch (error) {
-        console.error('Erreur recherche qualification:', error);
+        console.error('💥 Erreur searchQualificationForEnterprise:', error);
+        console.error('💥 Stack trace:', error.stack);
         return null;
     }
 }
