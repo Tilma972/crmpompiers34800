@@ -424,12 +424,13 @@ async function searchQualificationForEnterprise(enterpriseId) {
 
         const result = await response.json();
         
-        // ✅ CORRECTION : Utiliser result.data au lieu de result directement
+        // ✅ CORRECTION : result est maintenant directement le tableau
         console.log('🔍 Réponse API qualification:', result);
+        console.log('🔍 Type de réponse:', typeof result, 'Array?', Array.isArray(result));
         
-        if (result.success && result.data && result.data.length > 0) {
-            console.log('✅ Qualification trouvée:', result.data[0]);
-            return result.data[0];
+        if (Array.isArray(result) && result.length > 0) {
+            console.log('✅ Qualification trouvée:', result[0]);
+            return result[0];
         } else {
             console.log('❌ Aucune qualification trouvée pour enterprise_id:', enterpriseId);
             return null;
