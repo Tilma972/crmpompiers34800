@@ -1258,6 +1258,8 @@ function closeDocumentDialog() {
 // ================================
 
 function showQualificationValidationDialog(qualificationData, documentType) {
+    console.log('📋 Données qualification reçues:', qualificationData);
+    
     const dialogHTML = `
         <div class="qualification-validation">
             <h3>📋 Qualification trouvée pour ${selectedEnterprise.name}</h3>
@@ -1266,14 +1268,22 @@ function showQualificationValidationDialog(qualificationData, documentType) {
             <div class="form-group">
                 <label>Contact :</label>
                 <input type="text" id="validationInterlocuteur" 
-                       value="${qualificationData.interlocuteur}" readonly>
+                       value="${qualificationData.interlocuteur || 'Non spécifié'}" readonly>
+            </div>
+            
+            <div class="form-group">
+                <label>Email :</label>
+                <input type="email" id="validationEmail" 
+                       value="${qualificationData.email_contact || 'Non spécifié'}" readonly>
             </div>
             
             <div class="form-group">
                 <label>Format :</label>
                 <select id="validationFormat">
-                    <option value="6X4" ${qualificationData.format_encart?.value === '6X4' ? 'selected' : ''}>6X4</option>
-                    <option value="6X8" ${qualificationData.format_encart?.value === '6X8' ? 'selected' : ''}>6X8</option>
+                    <option value="6X4" ${qualificationData.format_encart?.value === '6X4' ? 'selected' : ''}>6X4 (350€)</option>
+                    <option value="6X8" ${qualificationData.format_encart?.value === '6X8' ? 'selected' : ''}>6X8 (500€)</option>
+                    <option value="12X4" ${qualificationData.format_encart?.value === '12X4' ? 'selected' : ''}>12X4 (500€)</option>
+                    <option value="12PARUTIONS" ${qualificationData.format_encart?.value === '12PARUTIONS' ? 'selected' : ''}>12 parutions (1800€)</option>
                 </select>
             </div>
             
@@ -1283,12 +1293,66 @@ function showQualificationValidationDialog(qualificationData, documentType) {
                        value="${qualificationData.prix_total}€" readonly>
             </div>
             
+            <!-- 🆕 SECTION STATUT PAIEMENT pour FACTURE -->
+            ${documentType === 'facture' ? `
+                <div class="form-group" style="border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin: 15px 0;">
+                    <h4 style="margin: 0 0 10px 0; color: #1d3557;">💰 Statut du paiement</h4>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <label>
+                            <input type="radio" name="paymentStatus" value="non_payee" checked onchange="togglePaymentFields()">
+                            ❌ Non payée (facture normale)
+                        </label>
+                    </div>
+                    
+                    <div style="margin-bottom: 10px;">
+                        <label>
+                            <input type="radio" name="paymentStatus" value="payee" onchange="togglePaymentFields()">
+                            ✅ Payée (facture acquittée)
+                        </label>
+                    </div>
+                    
+                    <!-- Champs de paiement (cachés par défaut) -->
+                    <div id="paymentDetails" style="display: none; margin-top: 10px; padding: 10px; background: #f0f9ff; border-radius: 5px;">
+                        <div class="form-group">
+                            <label>Mode de paiement :</label>
+                            <select id="validationPaiement">
+                                <option value="Virement" ${qualificationData.mode_paiement?.value === 'Virement' ? 'selected' : ''}>Virement</option>
+                                <option value="Cheque" ${qualificationData.mode_paiement?.value === 'Cheque' ? 'selected' : ''}>Chèque</option>
+                                <option value="Carte" ${qualificationData.mode_paiement?.value === 'Carte' ? 'selected' : ''}>Carte</option>
+                                <option value="Especes" ${qualificationData.mode_paiement?.value === 'Especes' ? 'selected' : ''}>Espèces</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Référence paiement (n° chèque, virement...) :</label>
+                            <input type="text" id="referencePaiement" placeholder="Ex: CHK123456, VIR789012...">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Date de paiement :</label>
+                            <input type="date" id="datePaiement" value="${new Date().toISOString().split('T')[0]}">
+                        </div>
+                    </div>
+                </div>
+            ` : `
+                <div class="form-group">
+                    <label>Mode de paiement :</label>
+                    <select id="validationPaiement">
+                        <option value="Virement" ${qualificationData.mode_paiement?.value === 'Virement' ? 'selected' : ''}>Virement</option>
+                        <option value="Cheque" ${qualificationData.mode_paiement?.value === 'Cheque' ? 'selected' : ''}>Chèque</option>
+                        <option value="Carte" ${qualificationData.mode_paiement?.value === 'Carte' ? 'selected' : ''}>Carte</option>
+                        <option value="Especes" ${qualificationData.mode_paiement?.value === 'Especes' ? 'selected' : ''}>Espèces</option>
+                    </select>
+                </div>
+            `}
+            
             <!-- BOUTONS D'ACTION -->
-            <div class="validation-buttons">
-                <button class="btn btn-primary" onclick="confirmGenerateDocument('${documentType}')">
-                    ✅ Générer ${documentType}
+            <div class="validation-buttons" style="margin-top: 20px;">
+                <button class="btn btn-primary" onclick="confirmGenerateDocument('${documentType}')" style="margin-bottom: 10px;">
+                    ✅ Générer ${documentType === 'facture' ? 'Facture' : 'Bon de commande'}
                 </button>
-                <button class="btn btn-secondary" onclick="editQualificationFirst()">
+                <button class="btn btn-secondary" onclick="editQualificationFirst()" style="margin-bottom: 10px;">
                     ✏️ Modifier d'abord
                 </button>
                 <button class="btn btn-secondary" onclick="showMainMenu()">
@@ -1303,8 +1367,92 @@ function showQualificationValidationDialog(qualificationData, documentType) {
     window.currentDocumentType = documentType;
     
     // Afficher le dialog
+    document.getElementById('stateTitle').innerHTML = `Génération ${documentType}`;
     document.getElementById('stateContent').innerHTML = dialogHTML;
     document.getElementById('conversationState').style.display = 'block';
+    document.getElementById('mainMenu').classList.add('hidden');
+    
+    console.log('✅ Dialog qualification affiché avec données:', {
+        contact: qualificationData.interlocuteur,
+        prix: qualificationData.prix_total,
+        format: qualificationData.format_encart?.value
+    });
+}
+
+// 🆕 FONCTION pour basculer l'affichage des champs de paiement
+function togglePaymentFields() {
+    const paymentStatus = document.querySelector('input[name="paymentStatus"]:checked').value;
+    const paymentDetails = document.getElementById('paymentDetails');
+    
+    if (paymentStatus === 'payee') {
+        paymentDetails.style.display = 'block';
+    } else {
+        paymentDetails.style.display = 'none';
+    }
+}
+
+// 🆕 FONCTION améliorée pour confirmer la génération
+async function confirmGenerateDocument(documentType) {
+    const qualData = window.currentQualificationData;
+    
+    // Récupérer les valeurs du dialog
+    const finalData = {
+        action: documentType,
+        data: {
+            enterprise_id: selectedEnterprise.id,
+            enterprise_name: selectedEnterprise.name,
+            format_encart: document.getElementById('validationFormat').value,
+            mois_parution: qualData.mois_parution,
+            mode_paiement: document.getElementById('validationPaiement').value,
+            interlocuteur: document.getElementById('validationInterlocuteur').value,
+            email_contact: document.getElementById('validationEmail').value,
+            prix_total: qualData.prix_total,
+            qualification_id: qualData.id,
+            user_id: user.id,
+            
+            // 🆕 DONNÉES DE PAIEMENT (pour facture)
+            est_payee: false,
+            reference_paiement: null,
+            date_paiement: null
+        }
+    };
+    
+    // Pour les factures, récupérer le statut de paiement
+    if (documentType === 'facture') {
+        const paymentStatus = document.querySelector('input[name="paymentStatus"]:checked').value;
+        finalData.data.est_payee = paymentStatus === 'payee';
+        
+        if (finalData.data.est_payee) {
+            finalData.data.reference_paiement = document.getElementById('referencePaiement').value || null;
+            finalData.data.date_paiement = document.getElementById('datePaiement').value || null;
+        }
+    }
+    
+    console.log('📤 Envoi données pour génération:', finalData);
+    updateStatus(`🔄 Génération ${documentType}...`);
+    
+    try {
+        const response = await fetch(N8N_WEBHOOKS.GATEWAY_ENTITIES, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(finalData)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        showMessage(`✅ ${documentType.toUpperCase()} ${finalData.data.est_payee ? 'acquittée ' : ''}générée avec succès !`);
+        updateStatus('✅ Document prêt');
+        showMainMenu();
+        
+    } catch (error) {
+        console.error('Erreur génération document:', error);
+        showMessage(`❌ Erreur génération ${documentType}`);
+        updateStatus('❌ Erreur génération');
+    }
 }
 
 function showCreateQualificationFirst(documentType) {
