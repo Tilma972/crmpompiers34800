@@ -497,12 +497,15 @@ function displayEnterpriseResults(results) {
         resultsDiv.innerHTML = '<div class="search-result-item">Aucun résultat trouvé</div>';
         document.getElementById('executeBtn').disabled = true;
     } else {
-        resultsDiv.innerHTML = results.map(result => `
-            <div class="search-result-item" onclick="selectEnterpriseForAction(${result.id}, '${result.nom_entreprise}')">
+        resultsDiv.innerHTML = results.map((result, index) => `
+            <div class="search-result-item" onclick="selectEnterpriseForAction(${index})">
                 <div class="result-name">${result.nom_entreprise}</div>
                 <div class="result-details">📍 ${result.commune} • 👤 ${result.interlocuteur || 'Pas de contact'}</div>
             </div>
         `).join('');
+        
+        // 🆕 Stocker les résultats pour récupération complète
+        window.currentSearchResults = results;
         document.getElementById('executeBtn').disabled = false;
     }
 
@@ -519,19 +522,62 @@ function selectEnterprise(id, name) {
     showMessage(`Entreprise sélectionnée: ${name}`);
 }
 
-function selectEnterpriseForAction(id, name) {
-    console.log('🎯 selectEnterpriseForAction appelée avec:', { id, name });
-    selectedEnterprise = { id, name };
-    console.log('✅ selectedEnterprise mise à jour:', selectedEnterprise);
-
-    document.getElementById('enterpriseInput').value = name;
+function selectEnterpriseForAction(resultIndex) {
+    console.log('🎯 selectEnterpriseForAction appelée avec index:', resultIndex);
+    
+    // 🏢 RÉCUPÉRATION COMPLÈTE DE L'ENTREPRISE
+    const fullEnterprise = window.currentSearchResults[resultIndex];
+    
+    if (!fullEnterprise) {
+        console.error('❌ Impossible de récupérer les données complètes de l\'entreprise');
+        return;
+    }
+    
+    console.log('📊 Données complètes entreprise récupérées:', fullEnterprise);
+    
+    // 🔄 STOCKAGE COMPLET avec tous les champs possibles
+    selectedEnterprise = {
+        // ID et nom (obligatoires)
+        id: fullEnterprise.id,
+        name: fullEnterprise.nom_entreprise,
+        nom_entreprise: fullEnterprise.nom_entreprise,
+        
+        // 🏢 DONNÉES ADRESSE COMPLÈTES
+        adresse: fullEnterprise.adresse || fullEnterprise.adresse_complete || fullEnterprise.adresse_ligne1,
+        commune: fullEnterprise.commune || fullEnterprise.ville,
+        code_postal: fullEnterprise.code_postal || fullEnterprise.cp,
+        
+        // 📞 CONTACT
+        telephone: fullEnterprise.telephone || fullEnterprise.tel || fullEnterprise.phone,
+        interlocuteur: fullEnterprise.interlocuteur || fullEnterprise.contact || fullEnterprise.contact_nom,
+        email: fullEnterprise.email || fullEnterprise.email_contact,
+        email_contact: fullEnterprise.email_contact || fullEnterprise.email,
+        
+        // 💼 DONNÉES MÉTIER
+        secteur_activite: fullEnterprise.secteur_activite || fullEnterprise.activite,
+        siret: fullEnterprise.siret || fullEnterprise.numero_siret,
+        
+        // 📊 DONNÉES HISTORIQUES (si disponibles)
+        Client_2025: fullEnterprise.Client_2025,
+        format_encart_2025: fullEnterprise.format_encart_2025,
+        mode_paiement_2024: fullEnterprise.mode_paiement_2024,
+        montant_payé_2024: fullEnterprise.montant_payé_2024,
+        
+        // 🔄 Objet complet en backup
+        _original: fullEnterprise
+    };
+    
+    console.log('✅ selectedEnterprise avec données complètes:', selectedEnterprise);
+    
+    // 🎨 MISE À JOUR INTERFACE
+    document.getElementById('enterpriseInput').value = selectedEnterprise.name;
     document.getElementById('enterpriseResults').style.display = 'none';
     document.getElementById('executeBtn').disabled = false;
-    updateStatus(`✅ ${name} sélectionnée`);
+    updateStatus(`✅ ${selectedEnterprise.name} sélectionnée (données complètes)`);
     
-    // 🆕 NOUVEAU : Auto-remplissage intelligent
+    // 🆕 NOUVEAU : Auto-remplissage intelligent avec données complètes
     try {
-        autoFillEnterpriseData(id, name);
+        autoFillEnterpriseData(selectedEnterprise.id, selectedEnterprise.name);
     } catch (error) {
         console.warn('Auto-remplissage échoué, continuant en mode manuel:', error);
     }
@@ -1446,26 +1492,73 @@ async function confirmGenerateDocument(documentType) {
         }
     }
     
-    // 📋 Construire les données de base
+    // 🏢 RÉCUPÉRATION COMPLÈTE DES DONNÉES ENTREPRISE
+    console.log('🏢 === DONNÉES ENTREPRISE SÉLECTIONNÉE ===');
+    console.log('📊 selectedEnterprise complète:', selectedEnterprise);
+    
+    // 🔄 FUSION INTELLIGENTE DES DONNÉES
+    // Priorité : 1) Saisie utilisateur, 2) Données qualification, 3) Données entreprise
+    const mergedData = {
+        // Données de base (toujours présentes)
+        enterprise_id: selectedEnterprise.id,
+        enterprise_name: selectedEnterprise.name || selectedEnterprise.nom_entreprise || 'Entreprise inconnue',
+        
+        // 🎯 DONNÉES QUALIFICATION (depuis le formulaire)
+        format_encart: formatElement?.value || qualData.format_encart?.value || '6X4',
+        mois_parution: qualData.mois_parution || 'Non spécifié',
+        mode_paiement: paiementElement?.value || qualData.mode_paiement?.value || qualData.mode_paiement || 'Virement',
+        prix_total: qualData.prix_total || 0,
+        qualification_id: qualData.id,
+        
+        // 🏢 DONNÉES ENTREPRISE COMPLÈTES (fusion intelligente)
+        // Contact : priorité saisie utilisateur > qualification > entreprise
+        interlocuteur: interlocuteurElement?.value || 
+                      qualData.interlocuteur || 
+                      selectedEnterprise.interlocuteur || 
+                      selectedEnterprise.contact || 
+                      'Contact à définir',
+                      
+        email_contact: emailElement?.value || 
+                      qualData.email_contact || 
+                      selectedEnterprise.email || 
+                      selectedEnterprise.email_contact || 
+                      'Email à définir',
+                      
+        // Adresse complète de l'entreprise (toujours depuis selectedEnterprise)
+        adresse: selectedEnterprise.adresse || 
+                selectedEnterprise.adresse_complete || 
+                'Adresse à compléter',
+                
+        commune: selectedEnterprise.commune || 
+                selectedEnterprise.ville || 
+                'Commune à compléter',
+                
+        telephone: selectedEnterprise.telephone || 
+                  selectedEnterprise.tel || 
+                  selectedEnterprise.phone || 
+                  'Téléphone à compléter',
+        
+        // Métadonnées
+        user_id: user.id,
+        
+        // 🆕 Initialiser les données de paiement
+        est_payee: false,
+        reference_paiement: null,
+        date_paiement: null
+    };
+    
+    console.log('🔄 === DONNÉES FUSIONNÉES ===');
+    console.log('✅ enterprise_name:', mergedData.enterprise_name);
+    console.log('✅ adresse:', mergedData.adresse);
+    console.log('✅ commune:', mergedData.commune);
+    console.log('✅ telephone:', mergedData.telephone);
+    console.log('✅ interlocuteur:', mergedData.interlocuteur);
+    console.log('✅ email_contact:', mergedData.email_contact);
+    
+    // 📋 Construire le payload final
     const finalData = {
         action: documentType,
-        data: {
-            enterprise_id: selectedEnterprise.id,
-            enterprise_name: selectedEnterprise.name,
-            format_encart: formatElement?.value || 'ERREUR',
-            mois_parution: qualData.mois_parution,
-            mode_paiement: paiementElement?.value || 'ERREUR',
-            interlocuteur: interlocuteurElement?.value || 'ERREUR',
-            email_contact: emailElement?.value || 'ERREUR',
-            prix_total: qualData.prix_total,
-            qualification_id: qualData.id,
-            user_id: user.id,
-            
-            // 🆕 Initialiser les données de paiement
-            est_payee: false,
-            reference_paiement: null,
-            date_paiement: null
-        }
+        data: mergedData
     };
     
     // 💰 Pour les factures, récupérer le statut de paiement
@@ -1507,6 +1600,40 @@ async function confirmGenerateDocument(documentType) {
             console.error('💥 Erreur traitement paiement:', error);
             finalData.data.est_payee = false;
         }
+    }
+    
+    // 🔍 VÉRIFICATION FINALE DES CHAMPS OBLIGATOIRES
+    console.log('🔍 === VÉRIFICATION FINALE ===');
+    const requiredFields = ['enterprise_name', 'adresse', 'commune', 'telephone', 'interlocuteur', 'email_contact'];
+    const missingFields = [];
+    
+    requiredFields.forEach(field => {
+        const value = finalData.data[field];
+        if (!value || value.includes('à compléter') || value.includes('à définir') || value === 'ERREUR') {
+            missingFields.push(field);
+            console.warn(`⚠️ Champ incomplet: ${field} = "${value}"`);
+        } else {
+            console.log(`✅ ${field}: "${value}"`);
+        }
+    });
+    
+    if (missingFields.length > 0) {
+        console.warn('⚠️ Champs incomplets détectés:', missingFields);
+        console.warn('🔄 Tentative de récupération depuis selectedEnterprise...');
+        
+        // Tentative de récupération depuis _original si disponible
+        if (selectedEnterprise._original) {
+            console.log('🔄 Utilisation des données _original pour compléter...');
+            missingFields.forEach(field => {
+                const originalValue = selectedEnterprise._original[field];
+                if (originalValue) {
+                    finalData.data[field] = originalValue;
+                    console.log(`🔧 ${field} complété avec: "${originalValue}"`);
+                }
+            });
+        }
+    } else {
+        console.log('✅ Tous les champs obligatoires sont renseignés !');
     }
     
     console.log('📤 === PAYLOAD FINAL ===');
