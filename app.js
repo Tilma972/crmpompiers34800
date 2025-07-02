@@ -430,37 +430,31 @@ async function searchQualificationForEnterprise(enterpriseId) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        // 🔍 DEBUG: Lire la réponse comme texte d'abord
-        const responseText = await response.text();
-        console.log('📝 Response text brut:', responseText);
-        console.log('📝 Response text length:', responseText.length);
-        
-        // Puis parser en JSON
-        let result;
-        try {
-            result = JSON.parse(responseText);
-            console.log('✅ JSON parsing réussi');
-        } catch (parseError) {
-            console.error('❌ Erreur parsing JSON:', parseError);
-            console.log('🔍 Premiers 200 caractères:', responseText.substring(0, 200));
-            return null;
-        }
+        const result = await response.json();
         
         console.log('🔍 Réponse API qualification:', result);
         console.log('🔍 Type de réponse:', typeof result);
         console.log('🔍 Est-ce un tableau?', Array.isArray(result));
         
-        if (Array.isArray(result)) {
+        if (Array.isArray(result) && result.length > 0) {
             console.log('🔍 Longueur du tableau:', result.length);
-            if (result.length > 0) {
-                console.log('✅ Qualification trouvée:', result[0]);
-                return result[0];
+            
+            // ✅ CORRECTION : Extraire les données depuis result[0].json
+            const qualificationData = result[0].json;
+            
+            if (qualificationData && qualificationData.id) {
+                console.log('✅ Qualification trouvée:', qualificationData);
+                console.log('👤 Contact:', qualificationData.interlocuteur);
+                console.log('💰 Prix:', qualificationData.prix_total);
+                console.log('📋 Format:', qualificationData.format_encart?.value);
+                
+                return qualificationData;
             } else {
-                console.log('❌ Tableau vide - Aucune qualification');
+                console.log('❌ Structure de données invalide dans result[0].json');
                 return null;
             }
         } else {
-            console.log('❌ La réponse n\'est pas un tableau:', result);
+            console.log('❌ Tableau vide - Aucune qualification');
             return null;
         }
 
