@@ -424,13 +424,12 @@ async function searchQualificationForEnterprise(enterpriseId) {
 
         const result = await response.json();
         
-        // ✅ CORRECTION : Le workflow retourne directement le tableau
-        // Pas besoin de result.data, c'est déjà le tableau
+        // ✅ CORRECTION : Utiliser result.data au lieu de result directement
         console.log('🔍 Réponse API qualification:', result);
         
-        if (Array.isArray(result) && result.length > 0) {
-            console.log('✅ Qualification trouvée:', result[0]);
-            return result[0];
+        if (result.success && result.data && result.data.length > 0) {
+            console.log('✅ Qualification trouvée:', result.data[0]);
+            return result.data[0];
         } else {
             console.log('❌ Aucune qualification trouvée pour enterprise_id:', enterpriseId);
             return null;
