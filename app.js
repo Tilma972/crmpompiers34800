@@ -8,7 +8,8 @@ const N8N_WEBHOOKS = {
     GATEWAY_ENTITIES: 'https://n8n.dsolution-ia.fr/webhook/gateway_entities',
     PDF_GENERATOR: 'https://n8n.dsolution-ia.fr/webhook/pdf_generator',
     EMAIL_WORKFLOW: 'https://n8n.dsolution-ia.fr/webhook/email_workflow',
-    FORM_ENTREPRISE: 'https://n8n.dsolution-ia.fr/webhook/form_entreprise'
+    FORM_ENTREPRISE: 'https://n8n.dsolution-ia.fr/webhook/form_entreprise',
+    QUALIFICATION_API: 'https://n8n.dsolution-ia.fr/webhook/recherche_qualification'
 };
 
 // Initialisation
@@ -402,6 +403,31 @@ async function searchEnterprisesForAction(query) {
     } catch (error) {
         console.error('Erreur recherche entreprise:', error);
         displayEnterpriseResults([]);
+    }
+}
+
+async function searchQualificationForEnterprise(enterpriseId) {
+    try {
+        const response = await fetch(N8N_WEBHOOKS.QUALIFICATION_API, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                enterprise_id: enterpriseId
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        return result && result.length > 0 ? result[0] : null;
+
+    } catch (error) {
+        console.error('Erreur recherche qualification:', error);
+        return null;
     }
 }
 
@@ -972,12 +998,20 @@ async function executeAction() {
     updateStatus('⚡ Exécution en cours...');
 
     try {
+        // 🎯 NOUVEAU : Vérification qualification pour facture/bon_commande
+        if (currentAction === 'facture' || currentAction === 'bon_commande') {
+            const qualification = await searchQualificationForEnterprise(selectedEnterprise.id);
+            
+            if (qualification) {
+                showQualificationValidationDialog(qualification, currentAction);
+            } else {
+                showCreateQualificationFirst(currentAction);
+            }
+            return;
+        }
+
         let webhookUrl;
         switch (currentAction) {
-            case 'facture':
-            case 'bon_commande':
-                webhookUrl = N8N_WEBHOOKS.PDF_GENERATOR;
-                break;
             case 'formulaire':
                 webhookUrl = N8N_WEBHOOKS.FORM_ENTREPRISE;
                 break;
@@ -1183,6 +1217,141 @@ function closeDocumentDialog() {
     document.getElementById('conversationState').style.display = 'none';
     window.qualificationData = null;
     showMainMenu();
+}
+
+// ================================
+// 📋 VALIDATION QUALIFICATION EXISTANTE
+// ================================
+
+function showQualificationValidationDialog(qualificationData, documentType) {
+    const dialogHTML = `
+        <div class="qualification-validation">
+            <h3>📋 Qualification trouvée pour ${selectedEnterprise.name}</h3>
+            
+            <!-- DONNÉES EN LECTURE SEULE OU MODIFIABLE -->
+            <div class="form-group">
+                <label>Contact :</label>
+                <input type="text" id="validationInterlocuteur" 
+                       value="${qualificationData.interlocuteur}" readonly>
+            </div>
+            
+            <div class="form-group">
+                <label>Format :</label>
+                <select id="validationFormat">
+                    <option value="6X4" ${qualificationData.format_encart?.value === '6X4' ? 'selected' : ''}>6X4</option>
+                    <option value="6X8" ${qualificationData.format_encart?.value === '6X8' ? 'selected' : ''}>6X8</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Prix :</label>
+                <input type="text" id="validationPrix" 
+                       value="${qualificationData.prix_total}€" readonly>
+            </div>
+            
+            <!-- BOUTONS D'ACTION -->
+            <div class="validation-buttons">
+                <button class="btn btn-primary" onclick="confirmGenerateDocument('${documentType}')">
+                    ✅ Générer ${documentType}
+                </button>
+                <button class="btn btn-secondary" onclick="editQualificationFirst()">
+                    ✏️ Modifier d'abord
+                </button>
+                <button class="btn btn-secondary" onclick="showMainMenu()">
+                    ❌ Annuler
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Stocker les données pour confirmation
+    window.currentQualificationData = qualificationData;
+    window.currentDocumentType = documentType;
+    
+    // Afficher le dialog
+    document.getElementById('stateContent').innerHTML = dialogHTML;
+    document.getElementById('conversationState').style.display = 'block';
+}
+
+function showCreateQualificationFirst(documentType) {
+    const dialogHTML = `
+        <div class="create-qualification-first">
+            <h3>⚠️ Aucune qualification trouvée</h3>
+            <p>Pour générer un ${documentType}, vous devez d'abord créer une qualification pour ${selectedEnterprise.name}.</p>
+            
+            <div class="info-box">
+                💡 La qualification contient les informations nécessaires (format, prix, contact) pour générer le document.
+            </div>
+            
+            <div class="validation-buttons">
+                <button class="btn btn-primary" onclick="createQualificationThenDocument('${documentType}')">
+                    🎯 Créer qualification
+                </button>
+                <button class="btn btn-secondary" onclick="showMainMenu()">
+                    ❌ Annuler
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Stocker le type de document pour après création
+    window.pendingDocumentType = documentType;
+    
+    // Afficher le dialog
+    document.getElementById('stateContent').innerHTML = dialogHTML;
+    document.getElementById('conversationState').style.display = 'block';
+}
+
+async function confirmGenerateDocument(documentType) {
+    const qualData = window.currentQualificationData;
+    
+    // Récupérer les valeurs du dialog (en cas de modification)
+    const finalData = {
+        action: documentType,
+        data: {
+            enterprise_id: selectedEnterprise.id,
+            enterprise_name: selectedEnterprise.name,
+            format_encart: document.getElementById('validationFormat').value,
+            mois_parution: qualData.mois_parution,
+            mode_paiement: qualData.mode_paiement?.value || qualData.mode_paiement,
+            interlocuteur: document.getElementById('validationInterlocuteur').value,
+            email_contact: qualData.email_contact,
+            prix_total: qualData.prix_total,
+            qualification_id: qualData.id, // Référence qualification source
+            user_id: user.id
+        }
+    };
+    
+    // ENVOI AU GATEWAY ENTITIES
+    try {
+        const response = await fetch(N8N_WEBHOOKS.GATEWAY_ENTITIES, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(finalData)
+        });
+        
+        const result = await response.json();
+        showMessage(`✅ ${documentType.toUpperCase()} généré avec succès !`);
+        showMainMenu();
+        
+    } catch (error) {
+        showMessage(`❌ Erreur génération ${documentType}`);
+    }
+}
+
+function editQualificationFirst() {
+    // Rediriger vers l'édition de qualification
+    currentAction = 'qualification';
+    showAction('qualification');
+}
+
+function createQualificationThenDocument(documentType) {
+    // Stocker le document à générer après
+    window.pendingDocumentType = documentType;
+    
+    // Rediriger vers création de qualification
+    currentAction = 'qualification';
+    showAction('qualification');
 }
 
 // ================================
