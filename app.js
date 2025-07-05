@@ -1439,207 +1439,28 @@ function togglePaymentFields() {
 
 // 🆕 FONCTION améliorée pour confirmer la génération
 async function confirmGenerateDocument(documentType) {
-    console.log('🚀 === DEBUG CONFIRM GENERATE DOCUMENT ===');
-    console.log('📋 Document type:', documentType);
-    
     const qualData = window.currentQualificationData;
-    console.log('📊 Qualification data:', qualData);
     
-    // 🔍 DEBUG: Vérifier existence des éléments DOM
-    console.log('🔍 === VÉRIFICATION ÉLÉMENTS DOM ===');
-    
-    const formatElement = document.getElementById('validationFormat');
-    const paiementElement = document.getElementById('validationPaiement');
-    const interlocuteurElement = document.getElementById('validationInterlocuteur');
-    const emailElement = document.getElementById('validationEmail');
-    
-    console.log('✅ Éléments de base trouvés:', {
-        format: !!formatElement,
-        paiement: !!paiementElement,
-        interlocuteur: !!interlocuteurElement,
-        email: !!emailElement
-    });
-    
-    // 🔍 DEBUG: Vérifier éléments de paiement (spécifiques facture)
-    if (documentType === 'facture') {
-        console.log('💰 === VÉRIFICATION ÉLÉMENTS PAIEMENT ===');
-        
-        const paymentStatusElements = document.querySelectorAll('input[name="paymentStatus"]');
-        const paymentDetailsDiv = document.getElementById('paymentDetails');
-        const referencePaiementElement = document.getElementById('referencePaiement');
-        const datePaiementElement = document.getElementById('datePaiement');
-        
-        console.log('💰 Éléments paiement trouvés:', {
-            paymentStatusRadios: paymentStatusElements.length,
-            paymentDetailsDiv: !!paymentDetailsDiv,
-            referencePaiement: !!referencePaiementElement,
-            datePaiement: !!datePaiementElement
-        });
-        
-        // Vérifier quel radio est sélectionné
-        const selectedPaymentStatus = document.querySelector('input[name="paymentStatus"]:checked');
-        console.log('📋 Statut paiement sélectionné:', {
-            found: !!selectedPaymentStatus,
-            value: selectedPaymentStatus?.value || 'AUCUN'
-        });
-        
-        if (referencePaiementElement) {
-            console.log('📝 Référence paiement value:', referencePaiementElement.value);
-        }
-        
-        if (datePaiementElement) {
-            console.log('📅 Date paiement value:', datePaiementElement.value);
-        }
-    }
-    
-    // 🏢 RÉCUPÉRATION COMPLÈTE DES DONNÉES ENTREPRISE
-    console.log('🏢 === DONNÉES ENTREPRISE SÉLECTIONNÉE ===');
-    console.log('📊 selectedEnterprise complète:', selectedEnterprise);
-    
-    // 🔄 FUSION INTELLIGENTE DES DONNÉES
-    // Priorité : 1) Saisie utilisateur, 2) Données qualification, 3) Données entreprise
-    const mergedData = {
-        // Données de base (toujours présentes)
-        enterprise_id: selectedEnterprise.id,
-        enterprise_name: selectedEnterprise.name || selectedEnterprise.nom_entreprise || 'Entreprise inconnue',
-        
-        // 🎯 DONNÉES QUALIFICATION (depuis le formulaire)
-        format_encart: formatElement?.value || qualData.format_encart?.value || '6X4',
-        mois_parution: qualData.mois_parution || 'Non spécifié',
-        mode_paiement: paiementElement?.value || qualData.mode_paiement?.value || qualData.mode_paiement || 'Virement',
-        prix_total: qualData.prix_total || 0,
-        qualification_id: qualData.id,
-        
-        // 🏢 DONNÉES ENTREPRISE COMPLÈTES (fusion intelligente)
-        // Contact : priorité saisie utilisateur > qualification > entreprise
-        interlocuteur: interlocuteurElement?.value || 
-                      qualData.interlocuteur || 
-                      selectedEnterprise.interlocuteur || 
-                      selectedEnterprise.contact || 
-                      'Contact à définir',
-                      
-        email_contact: emailElement?.value || 
-                      qualData.email_contact || 
-                      selectedEnterprise.email || 
-                      selectedEnterprise.email_contact || 
-                      'Email à définir',
-                      
-        // Adresse complète de l'entreprise (toujours depuis selectedEnterprise)
-        adresse: selectedEnterprise.adresse || 
-                selectedEnterprise.adresse_complete || 
-                'Adresse à compléter',
-                
-        commune: selectedEnterprise.commune || 
-                selectedEnterprise.ville || 
-                'Commune à compléter',
-                
-        telephone: selectedEnterprise.telephone || 
-                  selectedEnterprise.tel || 
-                  selectedEnterprise.phone || 
-                  'Téléphone à compléter',
-        
-        // Métadonnées
-        user_id: user.id,
-        
-        // 🆕 Initialiser les données de paiement
-        est_payee: false,
-        reference_paiement: null,
-        date_paiement: null
-    };
-    
-    console.log('🔄 === DONNÉES FUSIONNÉES ===');
-    console.log('✅ enterprise_name:', mergedData.enterprise_name);
-    console.log('✅ adresse:', mergedData.adresse);
-    console.log('✅ commune:', mergedData.commune);
-    console.log('✅ telephone:', mergedData.telephone);
-    console.log('✅ interlocuteur:', mergedData.interlocuteur);
-    console.log('✅ email_contact:', mergedData.email_contact);
-    
-    // 📋 Construire le payload final
+    // Récupérer les valeurs du dialog (en cas de modification)
     const finalData = {
         action: documentType,
-        data: mergedData
+        data: {
+            enterprise_id: selectedEnterprise.id,
+            enterprise_name: selectedEnterprise.name,
+            format_encart: document.getElementById('validationFormat').value,
+            mois_parution: qualData.mois_parution,
+            mode_paiement: qualData.mode_paiement?.value || qualData.mode_paiement,
+            interlocuteur: document.getElementById('validationInterlocuteur').value,
+            email_contact: qualData.email_contact,
+            prix_total: qualData.prix_total,
+            qualification_id: qualData.id,
+            user_id: user.id
+        }
     };
     
-    // 💰 Pour les factures, récupérer le statut de paiement
-    if (documentType === 'facture') {
-        console.log('💰 === TRAITEMENT DONNÉES PAIEMENT ===');
-        
-        try {
-            const paymentStatusElement = document.querySelector('input[name="paymentStatus"]:checked');
-            
-            if (paymentStatusElement) {
-                const paymentStatus = paymentStatusElement.value;
-                console.log('✅ Statut paiement récupéré:', paymentStatus);
-                
-                finalData.data.est_payee = paymentStatus === 'payee';
-                console.log('✅ est_payee défini à:', finalData.data.est_payee);
-                
-                if (finalData.data.est_payee) {
-                    const refElement = document.getElementById('referencePaiement');
-                    const dateElement = document.getElementById('datePaiement');
-                    
-                    if (refElement) {
-                        finalData.data.reference_paiement = refElement.value || null;
-                        console.log('✅ reference_paiement:', finalData.data.reference_paiement);
-                    }
-                    
-                    if (dateElement) {
-                        finalData.data.date_paiement = dateElement.value || null;
-                        console.log('✅ date_paiement:', finalData.data.date_paiement);
-                    }
-                } else {
-                    console.log('ℹ️ Facture non payée - pas de données paiement supplémentaires');
-                }
-            } else {
-                console.error('❌ Aucun radio de statut paiement sélectionné !');
-                // Utiliser par défaut "non payée"
-                finalData.data.est_payee = false;
-            }
-        } catch (error) {
-            console.error('💥 Erreur traitement paiement:', error);
-            finalData.data.est_payee = false;
-        }
-    }
-    
-    // 🔍 VÉRIFICATION FINALE DES CHAMPS OBLIGATOIRES
-    console.log('🔍 === VÉRIFICATION FINALE ===');
-    const requiredFields = ['enterprise_name', 'adresse', 'commune', 'telephone', 'interlocuteur', 'email_contact'];
-    const missingFields = [];
-    
-    requiredFields.forEach(field => {
-        const value = finalData.data[field];
-        if (!value || value.includes('à compléter') || value.includes('à définir') || value === 'ERREUR') {
-            missingFields.push(field);
-            console.warn(`⚠️ Champ incomplet: ${field} = "${value}"`);
-        } else {
-            console.log(`✅ ${field}: "${value}"`);
-        }
-    });
-    
-    if (missingFields.length > 0) {
-        console.warn('⚠️ Champs incomplets détectés:', missingFields);
-        console.warn('🔄 Tentative de récupération depuis selectedEnterprise...');
-        
-        // Tentative de récupération depuis _original si disponible
-        if (selectedEnterprise._original) {
-            console.log('🔄 Utilisation des données _original pour compléter...');
-            missingFields.forEach(field => {
-                const originalValue = selectedEnterprise._original[field];
-                if (originalValue) {
-                    finalData.data[field] = originalValue;
-                    console.log(`🔧 ${field} complété avec: "${originalValue}"`);
-                }
-            });
-        }
-    } else {
-        console.log('✅ Tous les champs obligatoires sont renseignés !');
-    }
-    
-    console.log('📤 === PAYLOAD FINAL ===');
-    console.log('📤 Données complètes à envoyer:', JSON.stringify(finalData, null, 2));
-    
-    updateStatus(`🔄 Génération ${documentType}...`);
+    // 🔄 INDICATEUR DE CHARGEMENT
+    updateStatus('⚡ Génération en cours...');
+    showLoadingState(documentType);
     
     try {
         const response = await fetch(N8N_WEBHOOKS.GATEWAY_ENTITIES, {
@@ -1649,20 +1470,169 @@ async function confirmGenerateDocument(documentType) {
         });
         
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`);
         }
         
         const result = await response.json();
         
-        showMessage(`✅ ${documentType.toUpperCase()} ${finalData.data.est_payee ? 'acquittée ' : ''}générée avec succès !`);
-        updateStatus('✅ Document prêt');
-        showMainMenu();
+        // 🎯 GESTION INTELLIGENTE DE LA RÉPONSE
+        if (result.success === false) {
+            throw new Error(result.error?.message || result.message || 'Erreur lors de la génération');
+        }
+        
+        // ✅ SUCCÈS - Afficher selon le contenu de la réponse
+        hideLoadingState();
+        
+        if (result.data?.file_url) {
+            // PDF généré et disponible
+            showDocumentSuccessDialog(result, documentType);
+        } else if (result.workflow_info?.pdf_generated) {
+            // PDF en cours de traitement
+            showMessage(`🔄 ${documentType.toUpperCase()} en cours de finalisation...`);
+            setTimeout(() => checkDocumentStatus(result.data.document_id), 3000);
+        } else {
+            // Succès générique
+            showMessage(`✅ ${documentType.toUpperCase()} générée avec succès !`);
+            showMainMenu();
+        }
         
     } catch (error) {
         console.error('💥 Erreur génération document:', error);
-        showMessage(`❌ Erreur génération ${documentType}`);
-        updateStatus('❌ Erreur génération');
+        hideLoadingState();
+        
+        // 🎨 MESSAGE D'ERREUR CONTEXTUALISÉ
+        if (error.message.includes('HTTP 50')) {
+            showMessage('❌ Erreur serveur. Veuillez réessayer dans quelques instants.');
+        } else if (error.message.includes('timeout')) {
+            showMessage('⏱️ Délai dépassé. Vérifiez votre connexion et réessayez.');
+        } else {
+            showMessage(`❌ Erreur: ${error.message}`);
+        }
+        
+        updateStatus('❌ Erreur de génération');
     }
+}
+
+// 🎉 NOUVEAU DIALOG DE SUCCÈS
+function showDocumentSuccessDialog(result, documentType) {
+    const data = result.data;
+    
+    const dialogHTML = `
+        <div class="success-dialog">
+            <div class="success-title">
+                ✅ ${documentType.toUpperCase()} générée avec succès !
+            </div>
+            
+            <div class="document-info">
+                <div class="info-row">
+                    <span>📄 Référence :</span>
+                    <span>${data.reference}</span>
+                </div>
+                <div class="info-row">
+                    <span>🏢 Entreprise :</span>
+                    <span>${data.enterprise_name}</span>
+                </div>
+                <div class="info-row">
+                    <span>💰 Montant :</span>
+                    <span>${data.amount}</span>
+                </div>
+                <div class="info-row">
+                    <span>📧 Email envoyé :</span>
+                    <span>${data.email_sent ? '✅ Oui' : '❌ Non'}</span>
+                </div>
+            </div>
+            
+            <div class="action-buttons">
+                ${data.preview_url ? `<button class="btn btn-primary" onclick="openPreview('${data.preview_url}')">👁️ Prévisualiser</button>` : ''}
+                ${data.file_url ? `<button class="btn btn-primary" onclick="downloadFile('${data.file_url}', '${data.filename}')">⬇️ Télécharger</button>` : ''}
+                ${!data.email_sent && data.contact ? `<button class="btn btn-secondary" onclick="sendDocumentByEmail('${data.document_id}')">📧 Envoyer par email</button>` : ''}
+                <button class="btn btn-secondary" onclick="closeSuccessDialog()">✅ Terminé</button>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('stateTitle').innerHTML = 'Document généré';
+    document.getElementById('stateContent').innerHTML = dialogHTML;
+    document.getElementById('conversationState').style.display = 'block';
+    
+    updateStatus(`✅ ${documentType} prête - Référence: ${data.reference}`);
+}
+
+// 🔄 FONCTIONS UTILITAIRES
+function showLoadingState(documentType) {
+    const loadingHTML = `
+        <div class="loading-state">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Génération de votre ${documentType} en cours...</div>
+            <div class="loading-steps">
+                <div class="step active">📄 Création du document</div>
+                <div class="step">💾 Sauvegarde sur Drive</div>
+                <div class="step">📧 Préparation email</div>
+                <div class="step">✅ Finalisation</div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('stateContent').innerHTML = loadingHTML;
+    document.getElementById('conversationState').style.display = 'block';
+}
+
+function hideLoadingState() {
+    // Animation de sortie optionnelle
+    const loadingDiv = document.querySelector('.loading-state');
+    if (loadingDiv) {
+        loadingDiv.style.opacity = '0';
+        setTimeout(() => {
+            loadingDiv.remove();
+        }, 300);
+    }
+}
+
+// 🎬 ACTIONS POST-GÉNÉRATION
+function openPreview(url) {
+    window.open(url, '_blank');
+    updateStatus('👁️ Prévisualisation ouverte');
+}
+
+function downloadFile(url, filename) {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || 'document.pdf';
+    link.click();
+    updateStatus('⬇️ Téléchargement lancé');
+}
+
+async function sendDocumentByEmail(documentId) {
+    try {
+        updateStatus('📧 Envoi en cours...');
+        
+        const response = await fetch(N8N_WEBHOOKS.EMAIL_WORKFLOW, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                action: 'send_document',
+                document_id: documentId
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showMessage('📧 Email envoyé avec succès !');
+            updateStatus('✅ Email envoyé');
+        } else {
+            throw new Error(result.message || 'Erreur envoi email');
+        }
+        
+    } catch (error) {
+        showMessage(`❌ Erreur envoi email: ${error.message}`);
+        updateStatus('❌ Erreur envoi email');
+    }
+}
+
+function closeSuccessDialog() {
+    document.getElementById('conversationState').style.display = 'none';
+    showMainMenu();
 }
 
 function showCreateQualificationFirst(documentType) {
