@@ -101,6 +101,13 @@ function showConversationState(actionType) {
     titleDiv.textContent = getActionLabel(actionType);
     contentDiv.innerHTML = getStateContent(actionType);
     stateDiv.style.display = 'block';
+    
+    // Initialiser les parutions multiples pour le formulaire de qualification
+    if (actionType === 'qualification') {
+        setTimeout(() => {
+            initializePublications();
+        }, 100);
+    }
 }
 
 function getActionLabel(actionType) {
@@ -198,28 +205,16 @@ function getQualificationContent() {
             </div>
         </div>
         
+        <!-- 🆕 SECTION PARUTIONS MULTIPLES -->
         <div class="form-group">
-            <label class="form-label">Nombre de parutions :</label>
-            <input type="number" class="form-input" id="nombreParutions" value="1" min="1" max="12">
-            <div class="price-display" id="priceDisplay">Prix total : 350€</div>
-        </div>
-        
-        <div class="form-group">
-            <label class="form-label">Mois de parution :</label>
-            <select class="form-select" id="moisParution">
-                <option value="Janvier">Janvier</option>
-                <option value="Février">Février</option>
-                <option value="Mars">Mars</option>
-                <option value="Avril">Avril</option>
-                <option value="Mai">Mai</option>
-                <option value="Juin">Juin</option>
-                <option value="Juillet">Juillet</option>
-                <option value="Août">Août</option>
-                <option value="Septembre">Septembre</option>
-                <option value="Octobre">Octobre</option>
-                <option value="Novembre">Novembre</option>
-                <option value="Décembre">Décembre</option>
-            </select>
+            <label class="form-label">Parutions :</label>
+            <div id="publicationsList" class="publications-list">
+                <!-- Publications ajoutées dynamiquement -->
+            </div>
+            <button type="button" class="btn btn-outline" onclick="addPublication()" id="addPublicationBtn">
+                ➕ Ajouter une parution
+            </button>
+            <div class="price-display" id="priceDisplay">Prix total : 0€</div>
         </div>
         
         <div class="form-group">
@@ -1140,15 +1135,13 @@ async function createQualification() {
     }
 
     // Récupération des données du formulaire
-    const formatEncart = document.getElementById('formatEncart').value;
-    const moisParution = document.getElementById('moisParution').value;
     const modePaiement = document.getElementById('modePaiement').value;
     const interlocuteur = document.getElementById('interlocuteur').value;
     const emailContact = document.getElementById('emailContact').value;
     const commentaires = document.getElementById('commentaires').value;
     
-    // 🆕 RÉCUPÉRATION DONNÉES OFFRE SÉLECTIONNÉE
-    const nombreParutions = document.getElementById('nombreParutions').value;
+    // 🆕 RÉCUPÉRATION DONNÉES PARUTIONS MULTIPLES
+    const publications = collectPublicationsData();
     const selectedOffer = window.selectedOffer;
 
     updateStatus('🎯 Création qualification...');
@@ -1159,17 +1152,15 @@ async function createQualification() {
             data: {
                 enterprise_id: selectedEnterprise.id,
                 enterprise_name: selectedEnterprise.name,
-                format_encart: formatEncart,
-                mois_parution: moisParution,
+                publications: publications,
                 mode_paiement: modePaiement,
                 interlocuteur: interlocuteur || null,
                 email_contact: emailContact || null,
                 commentaires: commentaires || null,
-                nombre_parutions: nombreParutions,
+                nombre_parutions: publications.length,
                 // 🆕 DONNÉES OFFRE INTELLIGENTE
                 offre_type: selectedOffer?.offre_type || 'standard',
-                prix_unitaire: selectedOffer?.prix_unitaire || getBasePriceByFormat(formatEncart),
-                prix_total: selectedOffer?.prix_total || (getBasePriceByFormat(formatEncart) * parseInt(nombreParutions)),
+                prix_total: calculateTotalPrice(publications),
                 user_id: user.id
             }
         };
@@ -1297,6 +1288,141 @@ function closeDocumentDialog() {
     document.getElementById('conversationState').style.display = 'none';
     window.qualificationData = null;
     showMainMenu();
+}
+
+// ================================
+// 🆕 GESTION PARUTIONS MULTIPLES
+// ================================
+
+let publicationCounter = 0;
+
+function addPublication() {
+    publicationCounter++;
+    const publicationsList = document.getElementById('publicationsList');
+    
+    const publicationDiv = document.createElement('div');
+    publicationDiv.className = 'publication-item';
+    publicationDiv.id = `publication-${publicationCounter}`;
+    
+    publicationDiv.innerHTML = `
+        <div class="publication-header">
+            <span class="publication-title">📅 Parution ${publicationCounter}</span>
+            <button type="button" class="btn btn-remove" onclick="removePublication(${publicationCounter})">❌</button>
+        </div>
+        <div class="publication-fields">
+            <div class="form-field">
+                <label>Mois :</label>
+                <select class="form-select" id="mois-${publicationCounter}" onchange="updateTotalPrice()">
+                    <option value="">Sélectionner...</option>
+                    <option value="Janvier">Janvier</option>
+                    <option value="Février">Février</option>
+                    <option value="Mars">Mars</option>
+                    <option value="Avril">Avril</option>
+                    <option value="Mai">Mai</option>
+                    <option value="Juin">Juin</option>
+                    <option value="Juillet">Juillet</option>
+                    <option value="Août">Août</option>
+                    <option value="Septembre">Septembre</option>
+                    <option value="Octobre">Octobre</option>
+                    <option value="Novembre">Novembre</option>
+                    <option value="Décembre">Décembre</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>Format :</label>
+                <select class="form-select" id="format-${publicationCounter}" onchange="updateTotalPrice()">
+                    <option value="">Sélectionner...</option>
+                    <option value="6X4">6X4 (350€)</option>
+                    <option value="6X8">6X8 (500€)</option>
+                    <option value="12X4">12X4 (500€)</option>
+                    <option value="12PARUTIONS">12 parutions (1800€)</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>Type :</label>
+                <select class="form-select" id="type-${publicationCounter}" onchange="updateTotalPrice()">
+                    <option value="payant">💰 Payant</option>
+                    <option value="offert">🎁 Offert</option>
+                </select>
+            </div>
+            <div class="publication-price" id="price-${publicationCounter}">0€</div>
+        </div>
+    `;
+    
+    publicationsList.appendChild(publicationDiv);
+    updateTotalPrice();
+}
+
+function removePublication(id) {
+    const publicationDiv = document.getElementById(`publication-${id}`);
+    if (publicationDiv) {
+        publicationDiv.remove();
+        updateTotalPrice();
+    }
+}
+
+function collectPublicationsData() {
+    const publications = [];
+    const publicationItems = document.querySelectorAll('.publication-item');
+    
+    publicationItems.forEach(item => {
+        const id = item.id.split('-')[1];
+        const mois = document.getElementById(`mois-${id}`).value;
+        const format = document.getElementById(`format-${id}`).value;
+        const type = document.getElementById(`type-${id}`).value;
+        
+        if (mois && format) {
+            publications.push({
+                mois: mois,
+                format: format,
+                type: type,
+                prix: type === 'offert' ? 0 : getBasePriceByFormat(format)
+            });
+        }
+    });
+    
+    return publications;
+}
+
+function calculateTotalPrice(publications) {
+    return publications.reduce((total, pub) => total + pub.prix, 0);
+}
+
+function updateTotalPrice() {
+    const publications = collectPublicationsData();
+    const total = calculateTotalPrice(publications);
+    document.getElementById('priceDisplay').textContent = `Prix total : ${total}€`;
+    
+    // Mettre à jour les prix individuels
+    publications.forEach((pub, index) => {
+        const publicationItems = document.querySelectorAll('.publication-item');
+        if (publicationItems[index]) {
+            const id = publicationItems[index].id.split('-')[1];
+            const priceElement = document.getElementById(`price-${id}`);
+            if (priceElement) {
+                priceElement.textContent = pub.type === 'offert' ? '🎁 Offert' : `${pub.prix}€`;
+                priceElement.className = pub.type === 'offert' ? 'publication-price free' : 'publication-price paid';
+            }
+        }
+    });
+}
+
+function getBasePriceByFormat(format) {
+    const prices = {
+        '6X4': 350,
+        '6X8': 500,
+        '12X4': 500,
+        '12PARUTIONS': 1800
+    };
+    return prices[format] || 0;
+}
+
+// Initialiser avec une première parution quand le formulaire de qualification est affiché
+function initializePublications() {
+    if (document.getElementById('publicationsList')) {
+        publicationCounter = 0; // Reset counter
+        addPublication();
+    }
 }
 
 // ================================
