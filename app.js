@@ -108,6 +108,13 @@ function showConversationState(actionType) {
             initializePublications();
         }, 100);
     }
+    
+    // Initialiser les statistiques de renouvellement
+    if (actionType === 'stats') {
+        setTimeout(() => {
+            chargerStatsRenouvellement();
+        }, 100);
+    }
 }
 
 function getActionLabel(actionType) {
@@ -139,6 +146,9 @@ function getStateContent(actionType) {
             
         case 'nouvelle_entreprise':
             return getNewEnterpriseContent();
+            
+        case 'stats':
+            return getStatsRenouvellementContent();
             
         default:
             return '<p>Fonctionnalité en développement...</p>';
@@ -2380,4 +2390,267 @@ function generateDocumentNumber(type) {
     const time = String(date.getTime()).slice(-6);
     
     return `${prefix}-${year}-${month}${day}-${time}`;
+}
+
+// ========================================================================
+// 📊 EXTENSION STATISTIQUES EXPRESS - RENOUVELLEMENT 2026
+// ========================================================================
+
+function getStatsRenouvellementContent() {
+    return `
+        <div class="stats-section">
+            <h3>📊 Tableau de bord Renouvellement 2026</h3>
+            
+            <!-- MÉTRIQUES PRINCIPALES -->
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-value" id="totalPartenaires2025">--</div>
+                    <div class="metric-label">Partenaires 2025</div>
+                </div>
+                <div class="metric-card success">
+                    <div class="metric-value" id="dejaRenouveles">--</div>
+                    <div class="metric-label">Déjà renouvelés</div>
+                </div>
+                <div class="metric-card warning">
+                    <div class="metric-value" id="enAttente">--</div>
+                    <div class="metric-label">En attente</div>
+                </div>
+                <div class="metric-card info">
+                    <div class="metric-value" id="tauxRenouvellement">--%</div>
+                    <div class="metric-label">Taux renouvellement</div>
+                </div>
+            </div>
+            
+            <!-- ACTIONS RAPIDES -->
+            <div class="actions-section">
+                <h4>⚡ Actions rapides</h4>
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="lancerCampagneRenouvellement()">
+                        📧 Lancer campagne renouvellement
+                    </button>
+                    <button class="btn btn-secondary" onclick="exporterListeEnAttente()">
+                        📋 Exporter liste en attente
+                    </button>
+                    <button class="btn btn-info" onclick="voirDetailsRenouvellement()">
+                        📊 Détails par statut
+                    </button>
+                </div>
+            </div>
+            
+            <!-- GRAPHIQUE RÉPARTITION -->
+            <div class="chart-section">
+                <h4>📈 Répartition des statuts</h4>
+                <canvas id="chartRenouvellement" width="300" height="150"></canvas>
+            </div>
+            
+            <!-- LISTE DES PROCHAINES ACTIONS -->
+            <div class="next-actions">
+                <h4>🎯 Prochaines actions recommandées</h4>
+                <div id="actionsRecommandees">
+                    <div class="loading">Chargement...</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-buttons">
+            <button class="btn btn-secondary" onclick="showMainMenu()">← Retour au menu</button>
+        </div>
+    `;
+}
+
+// 📊 FONCTION DE RÉCUPÉRATION DES STATISTIQUES
+async function chargerStatsRenouvellement() {
+    try {
+        updateStatus('📊 Chargement statistiques renouvellement...');
+        
+        const response = await fetch(N8N_WEBHOOKS.GATEWAY_ENTITIES, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'stats_renouvellement_2026',
+                data: { user_id: user.id }
+            })
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const stats = await response.json();
+        
+        // Mise à jour des métriques
+        document.getElementById('totalPartenaires2025').textContent = stats.total_partenaires_2025;
+        document.getElementById('dejaRenouveles').textContent = stats.deja_renouveles;
+        document.getElementById('enAttente').textContent = stats.en_attente;
+        document.getElementById('tauxRenouvellement').textContent = stats.taux_renouvellement + '%';
+        
+        // Générer le graphique
+        genererGraphiqueRenouvellement(stats);
+        
+        // Actions recommandées
+        afficherActionsRecommandees(stats);
+        
+        updateStatus('✅ Statistiques chargées');
+        
+    } catch (error) {
+        console.error('Erreur stats renouvellement:', error);
+        updateStatus('❌ Erreur chargement statistiques');
+    }
+}
+
+// 📧 LANCEMENT CAMPAGNE RENOUVELLEMENT
+async function lancerCampagneRenouvellement() {
+    const confirmation = confirm(
+        'Voulez-vous lancer la campagne de renouvellement ?\n\n' +
+        'Cela enverra un email à tous les partenaires 2025 ' +
+        'qui n\'ont pas encore renouvelé leur participation.'
+    );
+    
+    if (!confirmation) return;
+    
+    try {
+        updateStatus('📧 Lancement campagne renouvellement...');
+        
+        const response = await fetch(N8N_WEBHOOKS.EMAIL_WORKFLOW, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'campagne_renouvellement_2026',
+                data: {
+                    user_id: user.id,
+                    template_type: 'RENOUVELLEMENT_AVEC_RDV',
+                    filters: {
+                        Client_2025: 'Oui',
+                        'Paiement 2026 Reçu ?': false,
+                        Statut_Renouvellement_2026: 'En attente'
+                    }
+                }
+            })
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const result = await response.json();
+        
+        showMessage(`✅ Campagne lancée !\n${result.emails_sent} emails envoyés`);
+        
+        // Recharger les stats
+        setTimeout(() => chargerStatsRenouvellement(), 2000);
+        
+    } catch (error) {
+        console.error('Erreur campagne:', error);
+        showMessage('❌ Erreur lors du lancement de la campagne');
+    }
+}
+
+// 📋 EXPORT LISTE EN ATTENTE
+async function exporterListeEnAttente() {
+    try {
+        updateStatus('📋 Export liste en attente...');
+        
+        const response = await fetch(N8N_WEBHOOKS.GATEWAY_ENTITIES, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'export_liste_attente_2026',
+                data: { user_id: user.id }
+            })
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const result = await response.json();
+        
+        showMessage(`✅ Liste exportée !\n${result.count} entreprises en attente`);
+        
+    } catch (error) {
+        console.error('Erreur export:', error);
+        showMessage('❌ Erreur lors de l\'export');
+    }
+}
+
+// 📊 DÉTAILS RENOUVELLEMENT
+async function voirDetailsRenouvellement() {
+    try {
+        updateStatus('📊 Chargement détails...');
+        
+        const response = await fetch(N8N_WEBHOOKS.GATEWAY_ENTITIES, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'details_renouvellement_2026',
+                data: { user_id: user.id }
+            })
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const details = await response.json();
+        
+        showMessage(`📊 Détails renouvellement :\n${details.summary}`);
+        
+    } catch (error) {
+        console.error('Erreur détails:', error);
+        showMessage('❌ Erreur lors du chargement des détails');
+    }
+}
+
+// 📊 GÉNÉRATION GRAPHIQUE
+function genererGraphiqueRenouvellement(stats) {
+    const canvas = document.getElementById('chartRenouvellement');
+    const ctx = canvas.getContext('2d');
+    
+    // Données pour le graphique en secteurs
+    const data = [
+        { label: 'Renouvelés', value: stats.deja_renouveles, color: '#10b981' },
+        { label: 'En attente', value: stats.en_attente, color: '#f59e0b' },
+        { label: 'Relancés', value: stats.relances, color: '#3b82f6' },
+        { label: 'Non intéressés', value: stats.non_interesses, color: '#ef4444' }
+    ];
+    
+    // Dessiner le graphique (version simplifiée)
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const radius = 60;
+    
+    let currentAngle = 0;
+    const total = data.reduce((sum, item) => sum + item.value, 0);
+    
+    data.forEach(item => {
+        const sliceAngle = (item.value / total) * 2 * Math.PI;
+        
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
+        ctx.closePath();
+        ctx.fillStyle = item.color;
+        ctx.fill();
+        
+        currentAngle += sliceAngle;
+    });
+}
+
+// 🎯 ACTIONS RECOMMANDÉES
+function afficherActionsRecommandees(stats) {
+    const container = document.getElementById('actionsRecommandees');
+    
+    let actions = [];
+    
+    if (stats.en_attente > 0) {
+        actions.push(`📧 ${stats.en_attente} entreprises à relancer`);
+    }
+    
+    if (stats.relances_anciennes > 0) {
+        actions.push(`🔄 ${stats.relances_anciennes} relances à effectuer (> 15 jours)`);
+    }
+    
+    if (stats.formulaires_incomplets > 0) {
+        actions.push(`📝 ${stats.formulaires_incomplets} formulaires incomplets à suivre`);
+    }
+    
+    if (actions.length === 0) {
+        actions.push('✅ Aucune action urgente requise');
+    }
+    
+    container.innerHTML = actions.map(action => 
+        `<div class="action-item">${action}</div>`
+    ).join('');
 }
