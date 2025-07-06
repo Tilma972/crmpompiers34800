@@ -1099,6 +1099,11 @@ async function executeAction() {
             data: {
                 enterprise_id: selectedEnterprise.id,
                 enterprise_name: selectedEnterprise.name,
+                enterprise_adresse: selectedEnterprise.adresse,
+                enterprise_commune: selectedEnterprise.commune,
+                enterprise_telephone: selectedEnterprise.telephone,
+                interlocuteur: selectedEnterprise.interlocuteur,
+                email_contact: selectedEnterprise.email_contact,
                 user_id: user.id
             }
         };
@@ -1152,6 +1157,9 @@ async function createQualification() {
             data: {
                 enterprise_id: selectedEnterprise.id,
                 enterprise_name: selectedEnterprise.name,
+                enterprise_adresse: selectedEnterprise.adresse,
+                enterprise_commune: selectedEnterprise.commune,
+                enterprise_telephone: selectedEnterprise.telephone,
                 publications: publications,
                 mode_paiement: modePaiement,
                 interlocuteur: interlocuteur || null,
@@ -1551,6 +1559,9 @@ async function confirmGenerateDocument(documentType) {
     const baseData = {
         enterprise_id: selectedEnterprise.id,
         enterprise_name: selectedEnterprise.name,
+        enterprise_adresse: selectedEnterprise.adresse,
+        enterprise_commune: selectedEnterprise.commune,
+        enterprise_telephone: selectedEnterprise.telephone,
         format_encart: document.getElementById('validationFormat').value,
         mois_parution: qualData.mois_parution,
         mode_paiement: document.getElementById('validationPaiement').value,
