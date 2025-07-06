@@ -1430,10 +1430,9 @@ function initializePublications() {
 // ================================
 
 // 🔧 FONCTION MODIFIÉE - showQualificationValidationDialog
-// Remplace la fonction existante dans app.js
 
 function showQualificationValidationDialog(qualificationData, documentType) {
-    console.log('📋 Affichage dialog qualification avec données paiement...');
+    console.log('📋 Affichage dialog qualification simplifié...');
     console.log('📊 Données qualification:', qualificationData);
     console.log('📄 Type document:', documentType);
     
@@ -1470,59 +1469,46 @@ function showQualificationValidationDialog(qualificationData, documentType) {
                        value="${qualificationData.prix_total}€" readonly>
             </div>
             
-            <!-- 🆕 SECTION STATUT PAIEMENT pour FACTURE -->
+            <div class="form-group">
+                <label>Mode de paiement :</label>
+                <select id="validationPaiement">
+                    <option value="Virement" ${qualificationData.mode_paiement?.value === 'Virement' ? 'selected' : ''}>Virement</option>
+                    <option value="Cheque" ${qualificationData.mode_paiement?.value === 'Cheque' ? 'selected' : ''}>Chèque</option>
+                    <option value="Carte" ${qualificationData.mode_paiement?.value === 'Carte' ? 'selected' : ''}>Carte</option>
+                    <option value="Especes" ${qualificationData.mode_paiement?.value === 'Especes' ? 'selected' : ''}>Espèces</option>
+                </select>
+            </div>
+            
+            <!-- 🆕 SECTION PAIEMENT SIMPLIFIÉE pour FACTURE -->
             ${documentType === 'facture' ? `
-                <div class="form-group" style="border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin: 15px 0;">
-                    <h4 style="margin: 0 0 10px 0; color: #1d3557;">💰 Statut du paiement</h4>
+                <div class="form-group" style="border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin: 15px 0; background: #f8f9fa;">
+                    <h4 style="margin: 0 0 10px 0; color: #1d3557;">💰 Informations de paiement</h4>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 15px;">
+                        Si le paiement a été reçu, renseignez la référence ci-dessous. 
+                        <br><strong>Sinon, laissez vide pour une facture normale.</strong>
+                    </p>
                     
-                    <div style="margin-bottom: 10px;">
-                        <label style="display: flex; align-items: center; gap: 8px;">
-                            <input type="radio" name="paymentStatus" value="non_payee" checked>
-                            ❌ Non payée (facture normale)
-                        </label>
+                    <div class="form-group">
+                        <label>Référence paiement (si payé) :</label>
+                        <input type="text" id="referencePaiement" 
+                               placeholder="Ex: CHK123456, VIR789012, CB-1234..." 
+                               oninput="updatePaymentStatus()">
+                        <div class="readonly-indicator" style="font-size: 11px; color: #666; margin-top: 2px;">
+                            💡 Si renseigné → Facture acquittée automatiquement
+                        </div>
                     </div>
                     
-                    <div style="margin-bottom: 10px;">
-                        <label style="display: flex; align-items: center; gap: 8px;">
-                            <input type="radio" name="paymentStatus" value="payee">
-                            ✅ Payée (facture acquittée)
-                        </label>
+                    <div class="form-group">
+                        <label>Date de paiement :</label>
+                        <input type="date" id="datePaiement" value="${new Date().toISOString().split('T')[0]}">
                     </div>
                     
-                    <!-- Champs de paiement (cachés par défaut) -->
-                    <div id="paymentDetails" style="display: none; margin-top: 10px; padding: 10px; background: #f0f9ff; border-radius: 5px;">
-                        <div class="form-group">
-                            <label>Mode de paiement :</label>
-                            <select id="validationPaiement">
-                                <option value="Virement" ${qualificationData.mode_paiement?.value === 'Virement' ? 'selected' : ''}>Virement</option>
-                                <option value="Cheque" ${qualificationData.mode_paiement?.value === 'Cheque' ? 'selected' : ''}>Chèque</option>
-                                <option value="Carte" ${qualificationData.mode_paiement?.value === 'Carte' ? 'selected' : ''}>Carte</option>
-                                <option value="Especes" ${qualificationData.mode_paiement?.value === 'Especes' ? 'selected' : ''}>Espèces</option>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Référence paiement (n° chèque, virement...) :</label>
-                            <input type="text" id="referencePaiement" placeholder="Ex: CHK123456, VIR789012...">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Date de paiement :</label>
-                            <input type="date" id="datePaiement" value="${new Date().toISOString().split('T')[0]}">
-                        </div>
+                    <!-- Indicateur visuel du statut -->
+                    <div id="paymentStatusIndicator" style="margin-top: 10px; padding: 8px; border-radius: 5px; text-align: center; font-weight: 600;">
+                        📄 Facture normale (à régler)
                     </div>
                 </div>
-            ` : `
-                <div class="form-group">
-                    <label>Mode de paiement :</label>
-                    <select id="validationPaiement">
-                        <option value="Virement" ${qualificationData.mode_paiement?.value === 'Virement' ? 'selected' : ''}>Virement</option>
-                        <option value="Cheque" ${qualificationData.mode_paiement?.value === 'Cheque' ? 'selected' : ''}>Chèque</option>
-                        <option value="Carte" ${qualificationData.mode_paiement?.value === 'Carte' ? 'selected' : ''}>Carte</option>
-                        <option value="Especes" ${qualificationData.mode_paiement?.value === 'Especes' ? 'selected' : ''}>Espèces</option>
-                    </select>
-                </div>
-            `}
+            ` : ''}
             
             <!-- BOUTONS D'ACTION -->
             <div class="validation-buttons" style="margin-top: 20px;">
@@ -1534,11 +1520,6 @@ function showQualificationValidationDialog(qualificationData, documentType) {
                 </button>
                 <button class="btn btn-secondary" onclick="showMainMenu()">
                     ❌ Annuler
-                </button>
-                
-                <!-- 🔍 BOUTON DEBUG (à retirer en production) -->
-                <button class="btn btn-outline" onclick="debugPaymentFields()" style="margin-top: 10px; font-size: 12px;">
-                    🐛 Debug Paiement
                 </button>
             </div>
         </div>
@@ -1554,18 +1535,15 @@ function showQualificationValidationDialog(qualificationData, documentType) {
     document.getElementById('conversationState').style.display = 'block';
     document.getElementById('mainMenu').classList.add('hidden');
     
-    // 🎯 INITIALISER LES ÉVÉNEMENTS DE PAIEMENT
+    // 🎯 INITIALISER LA LOGIQUE AUTOMATIQUE pour factures
     if (documentType === 'facture') {
-        console.log('💳 Initialisation événements paiement pour facture...');
-        initializePaymentDialogEvents();
+        console.log('💳 Initialisation logique paiement automatique...');
+        setTimeout(() => {
+            updatePaymentStatus(); // État initial
+        }, 100);
     }
     
-    console.log('✅ Dialog qualification affiché avec données:', {
-        contact: qualificationData.interlocuteur,
-        prix: qualificationData.prix_total,
-        format: qualificationData.format_encart?.value,
-        type_document: documentType
-    });
+    console.log('✅ Dialog qualification simplifié affiché');
 }
 
 // 🆕 FONCTION AMÉLIORÉE - togglePaymentFields
@@ -1670,7 +1648,7 @@ function initializePaymentDialogEvents() {
 async function confirmGenerateDocument(documentType) {
     const qualData = window.currentQualificationData;
     
-    console.log('🎯 Génération document avec données paiement...');
+    console.log('🎯 Génération document avec logique paiement simplifiée...');
     console.log('📋 Type document:', documentType);
     
     // 📊 RÉCUPÉRATION DONNÉES DE BASE
@@ -1687,49 +1665,34 @@ async function confirmGenerateDocument(documentType) {
         user_id: user.id
     };
     
-    // 🆕 TRAITEMENT SPÉCIAL POUR FACTURES - Récupération statut paiement
+    // 🎯 LOGIQUE PAIEMENT SIMPLIFIÉE POUR FACTURES
     if (documentType === 'facture') {
-        console.log('💰 Traitement statut paiement pour facture...');
+        console.log('💰 Application logique paiement automatique...');
         
-        // Vérifier si les éléments de paiement existent
-        const paymentStatusElement = document.querySelector('input[name="paymentStatus"]:checked');
+        const referencePaiementElement = document.getElementById('referencePaiement');
+        const datePaiementElement = document.getElementById('datePaiement');
         
-        if (paymentStatusElement) {
-            const paymentStatus = paymentStatusElement.value;
-            console.log('✅ Statut paiement récupéré:', paymentStatus);
+        const referenceValue = referencePaiementElement ? referencePaiementElement.value.trim() : '';
+        const hasPaymentReference = referenceValue.length > 0;
+        
+        if (hasPaymentReference) {
+            // ✅ RÉFÉRENCE FOURNIE = FACTURE PAYÉE
+            baseData.est_payee = true;
+            baseData.reference_paiement = referenceValue;
             
-            if (paymentStatus === 'payee') {
-                // 🔄 FACTURE PAYÉE - Récupérer les détails
-                baseData.est_payee = true;
-                
-                const referencePaiementElement = document.getElementById('referencePaiement');
-                const datePaiementElement = document.getElementById('datePaiement');
-                
-                if (referencePaiementElement && referencePaiementElement.value) {
-                    baseData.reference_paiement = referencePaiementElement.value;
-                    console.log('📝 Référence paiement:', baseData.reference_paiement);
-                }
-                
-                if (datePaiementElement && datePaiementElement.value) {
-                    baseData.date_paiement = datePaiementElement.value;
-                    console.log('📅 Date paiement:', baseData.date_paiement);
-                }
-                
-                console.log('✅ Facture configurée comme PAYÉE');
-                
-            } else {
-                // ❌ FACTURE NON PAYÉE
-                baseData.est_payee = false;
-                console.log('⏳ Facture configurée comme NON PAYÉE');
+            if (datePaiementElement && datePaiementElement.value) {
+                baseData.date_paiement = datePaiementElement.value;
             }
+            
+            console.log('✅ AUTOMATIQUE: Facture PAYÉE');
+            console.log('📝 Référence:', baseData.reference_paiement);
+            console.log('📅 Date:', baseData.date_paiement);
+            
         } else {
-            // Par défaut si pas de sélection
+            // ❌ AUCUNE RÉFÉRENCE = FACTURE NORMALE
             baseData.est_payee = false;
-            console.log('⚠️ Pas de statut paiement sélectionné - Par défaut: NON PAYÉE');
+            console.log('📄 AUTOMATIQUE: Facture NON PAYÉE');
         }
-    } else {
-        // Pour les bons de commande, pas de statut de paiement
-        console.log('📋 Bon de commande - Pas de statut paiement');
     }
     
     // 🎯 CONSTRUCTION PAYLOAD FINAL
@@ -1739,10 +1702,11 @@ async function confirmGenerateDocument(documentType) {
     };
     
     // 📊 DEBUG - Afficher le payload final
-    console.log('📤 Payload final à envoyer:', JSON.stringify(finalData, null, 2));
+    console.log('📤 Payload final (logique simplifiée):', JSON.stringify(finalData, null, 2));
     console.log('💰 est_payee dans payload:', finalData.data.est_payee);
+    console.log('📝 reference_paiement:', finalData.data.reference_paiement);
     
-    // 🔄 INDICATEUR DE CHARGEMENT
+    // 🔄 ENVOI ET TRAITEMENT (reste identique)
     updateStatus('⚡ Génération en cours...');
     showLoadingState(documentType);
     
@@ -1764,33 +1728,27 @@ async function confirmGenerateDocument(documentType) {
         const result = await response.json();
         console.log('📋 Résultat reçu:', result);
         
-        // 🎯 GESTION INTELLIGENTE DE LA RÉPONSE
         if (result.success === false) {
             throw new Error(result.error?.message || result.message || 'Erreur lors de la génération');
         }
         
-        // ✅ SUCCÈS - Afficher selon le contenu de la réponse
+        // ✅ SUCCÈS
         hideLoadingState();
         
         if (result.data?.file_url) {
-            // PDF généré et disponible
             showDocumentSuccessDialog(result, documentType);
         } else if (result.workflow_info?.pdf_generated) {
-            // PDF en cours de traitement
             showMessage(`🔄 ${documentType.toUpperCase()} en cours de finalisation...`);
             setTimeout(() => checkDocumentStatus(result.data.document_id), 3000);
         } else {
-            // Succès générique
             showMessage(`✅ ${documentType.toUpperCase()} générée avec succès !`);
             showMainMenu();
         }
         
     } catch (error) {
-        console.error('💥 Erreur complète génération document:', error);
-        console.error('💥 Stack trace:', error.stack);
+        console.error('💥 Erreur génération document:', error);
         hideLoadingState();
         
-        // 🎨 MESSAGE D'ERREUR CONTEXTUALISÉ
         if (error.message.includes('HTTP 50')) {
             showMessage('❌ Erreur serveur. Veuillez réessayer dans quelques instants.');
         } else if (error.message.includes('timeout')) {
@@ -2105,3 +2063,31 @@ tg.MainButton.show();
 // Initialisation
 console.log('🚒 CRM Mini App initialisée avec auto-remplissage intelligent');
 updateStatus('🟢 Application prête');
+
+// 🆕 NOUVELLE FONCTION - Mise à jour automatique du statut
+function updatePaymentStatus() {
+    const referencePaiement = document.getElementById('referencePaiement');
+    const indicator = document.getElementById('paymentStatusIndicator');
+    
+    if (!referencePaiement || !indicator) return;
+    
+    const hasReference = referencePaiement.value.trim().length > 0;
+    
+    if (hasReference) {
+        // ✅ PAIEMENT REÇU
+        indicator.innerHTML = '✅ Facture acquittée (paiement reçu)';
+        indicator.style.background = '#d1fae5';
+        indicator.style.color = '#065f46';
+        indicator.style.border = '1px solid #10b981';
+        
+        console.log('✅ Statut: PAYÉE - Référence:', referencePaiement.value);
+    } else {
+        // ❌ FACTURE NORMALE
+        indicator.innerHTML = '📄 Facture normale (à régler)';
+        indicator.style.background = '#fef3c7';
+        indicator.style.color = '#92400e';
+        indicator.style.border = '1px solid #f59e0b';
+        
+        console.log('📄 Statut: NON PAYÉE');
+    }
+}
