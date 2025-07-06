@@ -1073,8 +1073,9 @@ async function executeAction() {
     updateStatus('⚡ Exécution en cours...');
 
     try {
-        // 🎯 NOUVEAU : Vérification qualification pour facture/bon_commande
-        if (currentAction === 'facture' || currentAction === 'bon_commande') {
+        // 🆕 LOGIQUE DIFFÉRENCIÉE PAR ACTION
+        if (currentAction === 'facture') {
+            // Pour les factures : obligation d'avoir une qualification
             const qualification = await searchQualificationForEnterprise(selectedEnterprise.id);
             
             if (qualification) {
@@ -1083,54 +1084,212 @@ async function executeAction() {
                 showCreateQualificationFirst(currentAction);
             }
             return;
-        }
+            
+        } else if (currentAction === 'bon_commande') {
+            // 🆕 NOUVEAU FLUX BON DE COMMANDE
+            // Pas d'obligation de qualification - envoi direct du formulaire
+            await handleBonCommandeDirect();
+            return;
+            
+        } else if (currentAction === 'formulaire') {
+            // Flux formulaire existant
+            let webhookUrl = N8N_WEBHOOKS.FORM_ENTREPRISE;
+            
+            const payload = {
+                action: currentAction,
+                data: {
+                    enterprise_id: selectedEnterprise.id,
+                    enterprise_name: selectedEnterprise.name,
+                    enterprise_adresse: selectedEnterprise.adresse,
+                    enterprise_commune: selectedEnterprise.commune,
+                    enterprise_telephone: selectedEnterprise.telephone,
+                    interlocuteur: selectedEnterprise.interlocuteur,
+                    email_contact: selectedEnterprise.email_contact,
+                    user_id: user.id
+                }
+            };
 
-        let webhookUrl;
-        switch (currentAction) {
-            case 'formulaire':
-                webhookUrl = N8N_WEBHOOKS.FORM_ENTREPRISE;
-                break;
-            default:
-                webhookUrl = N8N_WEBHOOKS.AGENT_CRM;
-        }
+            const response = await fetch(webhookUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
 
-        const payload = {
-            action: currentAction,
-            data: {
-                enterprise_id: selectedEnterprise.id,
-                enterprise_name: selectedEnterprise.name,
-                enterprise_adresse: selectedEnterprise.adresse,
-                enterprise_commune: selectedEnterprise.commune,
-                enterprise_telephone: selectedEnterprise.telephone,
-                interlocuteur: selectedEnterprise.interlocuteur,
-                email_contact: selectedEnterprise.email_contact,
-                user_id: user.id
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-        };
 
-        const response = await fetch(webhookUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            const result = await response.json();
+            updateStatus('✅ Action terminée');
+            alert(`✅ ${getActionLabel(currentAction)} exécutée avec succès!`);
+            showMainMenu();
         }
-
-        const result = await response.json();
-
-        updateStatus('✅ Action terminée');
-        alert(`✅ ${getActionLabel(currentAction)} exécutée avec succès!`);
-        showMainMenu();
 
     } catch (error) {
         console.error('💥 Erreur complète:', error);
         alert('❌ Erreur lors de l\'exécution: ' + error.message);
         updateStatus('❌ Erreur d\'exécution');
     }
+}
+
+// 🆕 NOUVELLE FONCTION - Gestion directe bon de commande
+async function handleBonCommandeDirect() {
+    console.log('📋 Bon de commande direct pour:', selectedEnterprise.name);
+    
+    // 🔍 ANALYSE DU TYPE CLIENT
+    const clientType = analyzeClientType(selectedEnterprise);
+    
+    // 📊 PRÉPARATION PAYLOAD COMPLET avec toutes les données disponibles
+    const payload = {
+        action: 'bon_commande',
+        data: {
+            // Données de base
+            enterprise_id: selectedEnterprise.id,
+            enterprise_name: selectedEnterprise.name,
+            nom_entreprise: selectedEnterprise.name,
+            
+            // Contact
+            contact_nom: selectedEnterprise.interlocuteur || 'Contact Entreprise',
+            email_contact: selectedEnterprise.email_contact || selectedEnterprise.email,
+            telephone: selectedEnterprise.telephone || selectedEnterprise.portable,
+            
+            // Adresse
+            adresse: selectedEnterprise.adresse,
+            commune: selectedEnterprise.commune,
+            
+            // Type de client
+            client_type: clientType.type,
+            is_renewal: clientType.is_renewal,
+            
+            // 🆕 DONNÉES HISTORIQUES pour renouvellement
+            format_2025: clientType.historical_data.format_2025,
+            mois_2025: clientType.historical_data.mois_2025,
+            montant_2025: clientType.historical_data.montant_2025,
+            mode_paiement_2025: clientType.historical_data.mode_paiement_2025,
+            
+            // Métadonnées
+            user_id: user.id,
+            source: 'mini_crm_direct',
+            timestamp: new Date().toISOString()
+        }
+    };
+    
+    console.log(`🎯 ${clientType.type.toUpperCase()} détecté:`, clientType);
+    
+    // 🔄 APPEL AU WORKFLOW BON DE COMMANDE (via Gateway Entities)
+    updateStatus(`📧 Envoi email ${clientType.type}...`);
+    
+    const response = await fetch(N8N_WEBHOOKS.GATEWAY_ENTITIES, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    // 🎉 AFFICHAGE RÉSULTAT
+    const messageType = clientType.is_renewal ? 'renouvellement' : 'nouveau client';
+    
+    showMessage(`✅ Email ${messageType} envoyé à ${selectedEnterprise.name}!`);
+    updateStatus(`✅ Formulaire ${messageType} envoyé`);
+    
+    // 🆕 AFFICHAGE DÉTAILS selon le type
+    if (clientType.is_renewal && clientType.historical_data.format_2025) {
+        setTimeout(() => {
+            showMessage(`📋 Rappel 2025: ${clientType.historical_data.format_2025} - ${clientType.historical_data.montant_2025}€`);
+        }, 1500);
+    }
+    
+    setTimeout(() => {
+        showMainMenu();
+    }, 3000);
+}
+
+// 🔍 FONCTION D'ANALYSE TYPE CLIENT
+function analyzeClientType(enterprise) {
+    console.log('🔍 Analyse type client pour:', enterprise.name);
+    console.log('📊 Client_2025:', enterprise.Client_2025);
+    console.log('📊 format_encart_2025:', enterprise.format_encart_2025);
+    console.log('📊 montant_payé_2024:', enterprise.montant_payé_2024);
+    
+    // Détermine si c'est un renouvellement
+    const isClient2025 = enterprise.Client_2025 === 'Oui';
+    const hasHistoricalData = enterprise.format_encart_2025 || enterprise.montant_payé_2024;
+    
+    // Extraction données historiques
+    const historicalData = {
+        format_2025: null,
+        mois_2025: null,
+        montant_2025: null,
+        mode_paiement_2025: null
+    };
+    
+    if (isClient2025) {
+        // Mapping des formats depuis les options Baserow
+        const formatMapping = {
+            2984058: '6X4',   // 6X4
+            2984059: '6X8',   // 6X8  
+            2984060: '12X4'   // 12X4
+        };
+        
+        const paiementMapping = {
+            2984072: 'Chèque',    // Chèque
+            2984073: 'Virement'   // Virement
+        };
+        
+        historicalData.format_2025 = formatMapping[enterprise.format_encart_2025] || enterprise.format_encart_2025?.value || null;
+        historicalData.mois_2025 = enterprise.mois_parution_2025 || null;
+        historicalData.montant_2025 = enterprise.montant_payé_2024 || null;
+        historicalData.mode_paiement_2025 = paiementMapping[enterprise.mode_paiement_2024] || enterprise.mode_paiement_2024?.value || null;
+    }
+    
+    const result = {
+        type: isClient2025 ? 'renouvellement' : 'nouveau',
+        is_renewal: isClient2025,
+        has_historical_data: hasHistoricalData,
+        historical_data: historicalData
+    };
+    
+    console.log('✅ Analyse terminée:', result);
+    return result;
+}
+
+// 🔧 FONCTION INCHANGÉE - pour showCreateQualificationFirst si besoin
+function showCreateQualificationFirst(documentType) {
+    const dialogHTML = `
+        <div class="create-qualification-first">
+            <h3>⚠️ Aucune qualification trouvée</h3>
+            <p>Pour générer un ${documentType}, vous devez d'abord créer une qualification pour ${selectedEnterprise.name}.</p>
+            
+            <div class="info-box">
+                💡 La qualification contient les informations nécessaires (format, prix, contact) pour générer le document.
+            </div>
+            
+            <div class="validation-buttons">
+                <button class="btn btn-primary" onclick="createQualificationThenDocument('${documentType}')">
+                    🎯 Créer qualification
+                </button>
+                <button class="btn btn-secondary" onclick="showMainMenu()">
+                    ❌ Annuler
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Stocker le type de document pour après création
+    window.pendingDocumentType = documentType;
+    
+    // Afficher le dialog
+    document.getElementById('stateContent').innerHTML = dialogHTML;
+    document.getElementById('conversationState').style.display = 'block';
 }
 
 async function createQualification() {
