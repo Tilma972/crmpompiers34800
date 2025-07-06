@@ -1429,8 +1429,13 @@ function initializePublications() {
 // 📋 VALIDATION QUALIFICATION EXISTANTE
 // ================================
 
+// 🔧 FONCTION MODIFIÉE - showQualificationValidationDialog
+// Remplace la fonction existante dans app.js
+
 function showQualificationValidationDialog(qualificationData, documentType) {
-    console.log('📋 Données qualification reçues:', qualificationData);
+    console.log('📋 Affichage dialog qualification avec données paiement...');
+    console.log('📊 Données qualification:', qualificationData);
+    console.log('📄 Type document:', documentType);
     
     const dialogHTML = `
         <div class="qualification-validation">
@@ -1471,15 +1476,15 @@ function showQualificationValidationDialog(qualificationData, documentType) {
                     <h4 style="margin: 0 0 10px 0; color: #1d3557;">💰 Statut du paiement</h4>
                     
                     <div style="margin-bottom: 10px;">
-                        <label>
-                            <input type="radio" name="paymentStatus" value="non_payee" checked onchange="togglePaymentFields()">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="radio" name="paymentStatus" value="non_payee" checked>
                             ❌ Non payée (facture normale)
                         </label>
                     </div>
                     
                     <div style="margin-bottom: 10px;">
-                        <label>
-                            <input type="radio" name="paymentStatus" value="payee" onchange="togglePaymentFields()">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="radio" name="paymentStatus" value="payee">
                             ✅ Payée (facture acquittée)
                         </label>
                     </div>
@@ -1530,6 +1535,11 @@ function showQualificationValidationDialog(qualificationData, documentType) {
                 <button class="btn btn-secondary" onclick="showMainMenu()">
                     ❌ Annuler
                 </button>
+                
+                <!-- 🔍 BOUTON DEBUG (à retirer en production) -->
+                <button class="btn btn-outline" onclick="debugPaymentFields()" style="margin-top: 10px; font-size: 12px;">
+                    🐛 Debug Paiement
+                </button>
             </div>
         </div>
     `;
@@ -1544,45 +1554,193 @@ function showQualificationValidationDialog(qualificationData, documentType) {
     document.getElementById('conversationState').style.display = 'block';
     document.getElementById('mainMenu').classList.add('hidden');
     
+    // 🎯 INITIALISER LES ÉVÉNEMENTS DE PAIEMENT
+    if (documentType === 'facture') {
+        console.log('💳 Initialisation événements paiement pour facture...');
+        initializePaymentDialogEvents();
+    }
+    
     console.log('✅ Dialog qualification affiché avec données:', {
         contact: qualificationData.interlocuteur,
         prix: qualificationData.prix_total,
-        format: qualificationData.format_encart?.value
+        format: qualificationData.format_encart?.value,
+        type_document: documentType
     });
 }
 
-// 🆕 FONCTION pour basculer l'affichage des champs de paiement
+// 🆕 FONCTION AMÉLIORÉE - togglePaymentFields
+
 function togglePaymentFields() {
-    const paymentStatus = document.querySelector('input[name="paymentStatus"]:checked').value;
+    console.log('🔄 Toggle des champs de paiement...');
+    
+    // Récupérer le statut sélectionné
+    const paymentStatusElement = document.querySelector('input[name="paymentStatus"]:checked');
+    
+    if (!paymentStatusElement) {
+        console.warn('⚠️ Aucun statut de paiement sélectionné');
+        return;
+    }
+    
+    const paymentStatus = paymentStatusElement.value;
     const paymentDetails = document.getElementById('paymentDetails');
     
-    if (paymentStatus === 'payee') {
-        paymentDetails.style.display = 'block';
-    } else {
-        paymentDetails.style.display = 'none';
+    console.log('💰 Statut paiement sélectionné:', paymentStatus);
+    
+    if (!paymentDetails) {
+        console.error('❌ Élément paymentDetails introuvable');
+        return;
     }
+    
+    if (paymentStatus === 'payee') {
+        // 💳 FACTURE PAYÉE - Afficher les champs
+        paymentDetails.style.display = 'block';
+        console.log('✅ Champs de paiement affichés');
+        
+        // Optionnel : Focus sur le premier champ
+        const referencePaiement = document.getElementById('referencePaiement');
+        if (referencePaiement) {
+            setTimeout(() => referencePaiement.focus(), 100);
+        }
+        
+    } else {
+        // ❌ FACTURE NON PAYÉE - Masquer les champs
+        paymentDetails.style.display = 'none';
+        console.log('❌ Champs de paiement masqués');
+        
+        // Nettoyer les valeurs
+        const referencePaiement = document.getElementById('referencePaiement');
+        const datePaiement = document.getElementById('datePaiement');
+        
+        if (referencePaiement) referencePaiement.value = '';
+        if (datePaiement) datePaiement.value = new Date().toISOString().split('T')[0]; // Remettre date du jour
+    }
+    
+    // 🔍 DEBUG des champs après toggle
+    debugPaymentFields();
+}
+
+// 🆕 FONCTION D'INITIALISATION DES ÉVÉNEMENTS
+function initializePaymentEvents() {
+    console.log('🎯 Initialisation des événements de paiement...');
+    
+    // Ajouter les event listeners sur les radio buttons
+    const paymentRadios = document.querySelectorAll('input[name="paymentStatus"]');
+    
+    paymentRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            console.log('📻 Radio button changé:', this.value);
+            togglePaymentFields();
+        });
+    });
+    
+    // Event listener pour debug sur les champs de référence
+    const referencePaiement = document.getElementById('referencePaiement');
+    if (referencePaiement) {
+        referencePaiement.addEventListener('input', function() {
+            console.log('📝 Référence paiement modifiée:', this.value);
+        });
+    }
+    
+    const datePaiement = document.getElementById('datePaiement');
+    if (datePaiement) {
+        datePaiement.addEventListener('change', function() {
+            console.log('📅 Date paiement modifiée:', this.value);
+        });
+    }
+    
+    console.log('✅ Événements de paiement initialisés');
+}
+
+// 🎯 APPELER CETTE FONCTION APRÈS CRÉATION DU DIALOG
+// À ajouter dans showQualificationValidationDialog après insertion du HTML
+function initializePaymentDialogEvents() {
+    // Attendre que le DOM soit mis à jour
+    setTimeout(() => {
+        initializePaymentEvents();
+        
+        // Initialiser l'état par défaut
+        const defaultRadio = document.querySelector('input[name="paymentStatus"][value="non_payee"]');
+        if (defaultRadio && defaultRadio.checked) {
+            togglePaymentFields();
+        }
+    }, 100);
 }
 
 // 🆕 FONCTION améliorée pour confirmer la génération
 async function confirmGenerateDocument(documentType) {
     const qualData = window.currentQualificationData;
     
-    // Récupérer les valeurs du dialog (en cas de modification)
+    console.log('🎯 Génération document avec données paiement...');
+    console.log('📋 Type document:', documentType);
+    
+    // 📊 RÉCUPÉRATION DONNÉES DE BASE
+    const baseData = {
+        enterprise_id: selectedEnterprise.id,
+        enterprise_name: selectedEnterprise.name,
+        format_encart: document.getElementById('validationFormat').value,
+        mois_parution: qualData.mois_parution,
+        mode_paiement: document.getElementById('validationPaiement').value,
+        interlocuteur: document.getElementById('validationInterlocuteur').value,
+        email_contact: qualData.email_contact,
+        prix_total: qualData.prix_total,
+        qualification_id: qualData.id,
+        user_id: user.id
+    };
+    
+    // 🆕 TRAITEMENT SPÉCIAL POUR FACTURES - Récupération statut paiement
+    if (documentType === 'facture') {
+        console.log('💰 Traitement statut paiement pour facture...');
+        
+        // Vérifier si les éléments de paiement existent
+        const paymentStatusElement = document.querySelector('input[name="paymentStatus"]:checked');
+        
+        if (paymentStatusElement) {
+            const paymentStatus = paymentStatusElement.value;
+            console.log('✅ Statut paiement récupéré:', paymentStatus);
+            
+            if (paymentStatus === 'payee') {
+                // 🔄 FACTURE PAYÉE - Récupérer les détails
+                baseData.est_payee = true;
+                
+                const referencePaiementElement = document.getElementById('referencePaiement');
+                const datePaiementElement = document.getElementById('datePaiement');
+                
+                if (referencePaiementElement && referencePaiementElement.value) {
+                    baseData.reference_paiement = referencePaiementElement.value;
+                    console.log('📝 Référence paiement:', baseData.reference_paiement);
+                }
+                
+                if (datePaiementElement && datePaiementElement.value) {
+                    baseData.date_paiement = datePaiementElement.value;
+                    console.log('📅 Date paiement:', baseData.date_paiement);
+                }
+                
+                console.log('✅ Facture configurée comme PAYÉE');
+                
+            } else {
+                // ❌ FACTURE NON PAYÉE
+                baseData.est_payee = false;
+                console.log('⏳ Facture configurée comme NON PAYÉE');
+            }
+        } else {
+            // Par défaut si pas de sélection
+            baseData.est_payee = false;
+            console.log('⚠️ Pas de statut paiement sélectionné - Par défaut: NON PAYÉE');
+        }
+    } else {
+        // Pour les bons de commande, pas de statut de paiement
+        console.log('📋 Bon de commande - Pas de statut paiement');
+    }
+    
+    // 🎯 CONSTRUCTION PAYLOAD FINAL
     const finalData = {
         action: documentType,
-        data: {
-            enterprise_id: selectedEnterprise.id,
-            enterprise_name: selectedEnterprise.name,
-            format_encart: document.getElementById('validationFormat').value,
-            mois_parution: qualData.mois_parution,
-            mode_paiement: qualData.mode_paiement?.value || qualData.mode_paiement,
-            interlocuteur: document.getElementById('validationInterlocuteur').value,
-            email_contact: qualData.email_contact,
-            prix_total: qualData.prix_total,
-            qualification_id: qualData.id,
-            user_id: user.id
-        }
+        data: baseData
     };
+    
+    // 📊 DEBUG - Afficher le payload final
+    console.log('📤 Payload final à envoyer:', JSON.stringify(finalData, null, 2));
+    console.log('💰 est_payee dans payload:', finalData.data.est_payee);
     
     // 🔄 INDICATEUR DE CHARGEMENT
     updateStatus('⚡ Génération en cours...');
@@ -1595,11 +1753,16 @@ async function confirmGenerateDocument(documentType) {
             body: JSON.stringify(finalData)
         });
         
+        console.log('📡 Réponse reçue, status:', response.status);
+        
         if (!response.ok) {
+            const errorText = await response.text();
+            console.error('❌ Erreur HTTP:', response.status, errorText);
             throw new Error(`Erreur HTTP ${response.status}: ${response.statusText}`);
         }
         
         const result = await response.json();
+        console.log('📋 Résultat reçu:', result);
         
         // 🎯 GESTION INTELLIGENTE DE LA RÉPONSE
         if (result.success === false) {
@@ -1623,7 +1786,8 @@ async function confirmGenerateDocument(documentType) {
         }
         
     } catch (error) {
-        console.error('💥 Erreur génération document:', error);
+        console.error('💥 Erreur complète génération document:', error);
+        console.error('💥 Stack trace:', error.stack);
         hideLoadingState();
         
         // 🎨 MESSAGE D'ERREUR CONTEXTUALISÉ
@@ -1637,6 +1801,26 @@ async function confirmGenerateDocument(documentType) {
         
         updateStatus('❌ Erreur de génération');
     }
+}
+
+// 🆕 FONCTION UTILITAIRE POUR DEBUG
+function debugPaymentFields() {
+    console.log('🔍 DEBUG - État des champs de paiement:');
+    
+    const paymentStatus = document.querySelector('input[name="paymentStatus"]:checked');
+    console.log('- Statut sélectionné:', paymentStatus ? paymentStatus.value : 'AUCUN');
+    
+    const paymentDetails = document.getElementById('paymentDetails');
+    console.log('- Section détails visible:', paymentDetails ? paymentDetails.style.display !== 'none' : 'N/A');
+    
+    const referencePaiement = document.getElementById('referencePaiement');
+    console.log('- Référence paiement:', referencePaiement ? referencePaiement.value : 'N/A');
+    
+    const datePaiement = document.getElementById('datePaiement');
+    console.log('- Date paiement:', datePaiement ? datePaiement.value : 'N/A');
+    
+    const validationPaiement = document.getElementById('validationPaiement');
+    console.log('- Mode paiement:', validationPaiement ? validationPaiement.value : 'N/A');
 }
 
 // 🎉 NOUVEAU DIALOG DE SUCCÈS
