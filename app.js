@@ -1217,14 +1217,21 @@ async function handleBonCommandeDirect() {
 function analyzeClientType(enterprise) {
     console.log('🔍 Analyse type client pour:', enterprise.name);
     console.log('📊 Client_2025:', enterprise.Client_2025);
+    console.log('📊 client_2025:', enterprise.client_2025);
+    console.log('📊 _original.client_2025:', enterprise._original?.client_2025);
     console.log('📊 format_encart_2025:', enterprise.format_encart_2025);
     console.log('📊 montant_payé_2024:', enterprise.montant_payé_2024);
     
-    // Détermine si c'est un renouvellement
-    const isClient2025 = enterprise.Client_2025 === 'Oui';
-    const hasHistoricalData = enterprise.format_encart_2025 || enterprise.montant_payé_2024;
+    // 🔧 CORRECTION : Vérifier toutes les variantes possibles
+    const isClient2025 = enterprise.Client_2025 === 'Oui' || 
+                         enterprise.client_2025 === 'Oui' ||
+                         enterprise._original?.client_2025 === 'Oui';
+    const hasHistoricalData = enterprise.format_encart_2025 || 
+                             enterprise.montant_payé_2024 ||
+                             enterprise._original?.format_encart_2025 ||
+                             enterprise._original?.montant_payé_2024;
     
-    // Extraction données historiques
+    // Extraction données historiques avec fallback sur _original
     const historicalData = {
         format_2025: null,
         mois_2025: null,
@@ -1245,10 +1252,17 @@ function analyzeClientType(enterprise) {
             2984073: 'Virement'   // Virement
         };
         
-        historicalData.format_2025 = formatMapping[enterprise.format_encart_2025] || enterprise.format_encart_2025?.value || null;
-        historicalData.mois_2025 = enterprise.mois_parution_2025 || null;
-        historicalData.montant_2025 = enterprise.montant_payé_2024 || null;
-        historicalData.mode_paiement_2025 = paiementMapping[enterprise.mode_paiement_2024] || enterprise.mode_paiement_2024?.value || null;
+        // 🔧 UTILISER _original si les données principales sont vides
+        const sourceData = enterprise._original || enterprise;
+        
+        historicalData.format_2025 = formatMapping[sourceData.format_encart_2025] || 
+                                     sourceData.format_encart_2025?.value || 
+                                     sourceData.format_encart_2025 || null;
+        historicalData.mois_2025 = sourceData.mois_parution_2025 || null;
+        historicalData.montant_2025 = sourceData.montant_payé_2024 || null;
+        historicalData.mode_paiement_2025 = paiementMapping[sourceData.mode_paiement_2024] || 
+                                           sourceData.mode_paiement_2024?.value || 
+                                           sourceData.mode_paiement_2024 || null;
     }
     
     const result = {
