@@ -1979,3 +1979,232 @@ function updatePaymentStatus() {
         console.log('📄 Statut: NON PAYÉE');
     }
 }
+
+// ========================================================================
+// 🎯 GÉNÉRATEUR DE DOCUMENT INTELLIGENT - Parutions multiples
+// Amélioration du workflow Gateway Entities pour factures précises
+// ========================================================================
+
+// ========================================================================
+// 1. NOUVELLE FONCTION - Analyser les publications depuis les commentaires
+// ========================================================================
+
+function parsePublicationsFromComments(commentaires, moisParution, prixTotal, formatPrincipal) {
+    console.log('🔍 Analyse publications depuis commentaires:', commentaires);
+    
+    // Chercher le pattern "Publications: ..."
+    const publicationsRegex = /Publications:\s*([^|]+)/i;
+    const match = commentaires.match(publicationsRegex);
+    
+    if (!match) {
+        console.log('❌ Pas de détail publications trouvé, utilisation des données simples');
+        return {
+            publications: [{
+                mois: moisParution,
+                format: formatPrincipal,
+                prix: prixTotal,
+                type: 'payant'
+            }],
+            has_multiple: false,
+            has_free: false
+        };
+    }
+    
+    const publicationsText = match[1].trim();
+    console.log('📋 Texte publications extrait:', publicationsText);
+    
+    // Parser chaque publication: "Mai 6X8 (500€), Juin 6X8 (500€), Juillet 6X4 (offert)"
+    const publicationItems = publicationsText.split(',').map(item => item.trim());
+    const publications = [];
+    
+    publicationItems.forEach(item => {
+        // Pattern: "Mois Format (prix)" ou "Mois Format (offert)"
+        const itemMatch = item.match(/(\w+)\s+(\w+)\s+\(([^)]+)\)/);
+        
+        if (itemMatch) {
+            const [, mois, format, priceInfo] = itemMatch;
+            
+            let prix = 0;
+            let type = 'payant';
+            
+            if (priceInfo.toLowerCase().includes('offert') || priceInfo.toLowerCase().includes('gratuit')) {
+                prix = 0;
+                type = 'offert';
+            } else {
+                // Extraire le prix : "500€" -> 500
+                const prixMatch = priceInfo.match(/(\d+)/);
+                prix = prixMatch ? parseInt(prixMatch[1]) : 0;
+            }
+            
+            publications.push({
+                mois: mois.trim(),
+                format: format.trim(),
+                prix: prix,
+                type: type
+            });
+            
+            console.log(`📅 Publication parsée: ${mois} ${format} ${prix}€ (${type})`);
+        }
+    });
+    
+    const hasMultiple = publications.length > 1;
+    const hasFree = publications.some(p => p.type === 'offert');
+    
+    console.log(`✅ ${publications.length} publication(s) analysée(s), ${hasFree ? 'avec gratuités' : 'toutes payantes'}`);
+    
+    return {
+        publications: publications,
+        has_multiple: hasMultiple,
+        has_free: hasFree
+    };
+}
+
+// ========================================================================
+// 2. FONCTION AMÉLIORÉE - Préparer données pour génération facture
+// ========================================================================
+
+function prepareEnhancedInvoiceData(qualificationData, documentType = 'facture') {
+    console.log('📄 Préparation données facture/BC améliorée');
+    
+    // Extraction des données de base
+    const baseData = {
+        nom_entreprise: qualificationData.nom_entreprise || '',
+        interlocuteur: qualificationData.interlocuteur || '',
+        email: qualificationData.email_contact || '',
+        telephone: qualificationData.Telephone_Contact || '',
+        adresse: qualificationData.adresse || '',
+        prix_total: qualificationData.prix_total || 0,
+        mode_paiement: qualificationData.mode_paiement?.value || 'Virement',
+        commentaires: qualificationData.commentaires || ''
+    };
+    
+    // 🎯 ANALYSE DES PUBLICATIONS
+    const publicationsAnalysis = parsePublicationsFromComments(
+        baseData.commentaires,
+        qualificationData.mois_parution,
+        parseInt(baseData.prix_total),
+        qualificationData.format_encart?.value || '6X4'
+    );
+    
+    // 🎯 GÉNÉRATION DONNÉES POUR TEMPLATE
+    if (publicationsAnalysis.has_multiple) {
+        // === CAS PARUTIONS MULTIPLES ===
+        console.log('📋 Génération pour parutions multiples');
+        
+        const publicationsPayantes = publicationsAnalysis.publications.filter(p => p.type === 'payant');
+        const publicationsOffertes = publicationsAnalysis.publications.filter(p => p.type === 'offert');
+        
+        return {
+            ...baseData,
+            
+            // Type de document
+            document_type: documentType,
+            is_multi_publications: true,
+            
+            // Publications détaillées
+            publications_detail: publicationsAnalysis.publications,
+            publications_payantes: publicationsPayantes,
+            publications_offertes: publicationsOffertes,
+            
+            // Résumés pour affichage
+            description_ligne1: generateMultiPublicationsDescription(publicationsPayantes),
+            description_ligne2: publicationsOffertes.length > 0 ? 
+                `+ ${publicationsOffertes.length} parution(s) offerte(s): ${publicationsOffertes.map(p => `${p.mois} ${p.format}`).join(', ')}` : null,
+            
+            // Prix
+            montant_payant: publicationsPayantes.reduce((sum, p) => sum + p.prix, 0),
+            montant_offert: publicationsOffertes.reduce((sum, p) => sum + (p.prix || 0), 0),
+            
+            // Format principal (pour fallback)
+            format_principal: findMostUsedFormat(publicationsAnalysis.publications),
+            mois_liste: publicationsAnalysis.publications.map(p => p.mois).join(', '),
+            
+            // Flags
+            has_free_publications: publicationsOffertes.length > 0,
+            total_publications: publicationsAnalysis.publications.length
+        };
+        
+    } else {
+        // === CAS PUBLICATION SIMPLE ===
+        console.log('📋 Génération pour publication simple');
+        
+        const publication = publicationsAnalysis.publications[0];
+        
+        return {
+            ...baseData,
+            document_type: documentType,
+            is_multi_publications: false,
+            
+            // Publication unique
+            format_encart: publication.format,
+            mois_parution: publication.mois,
+            prix_unitaire: publication.prix,
+            
+            // Description simple
+            description_ligne1: `Insertion publicitaire ${publication.format} - ${publication.mois} 2026`,
+            description_ligne2: null,
+            
+            // Prix
+            montant_payant: publication.prix,
+            montant_offert: 0,
+            
+            // Flags
+            has_free_publications: false,
+            total_publications: 1
+        };
+    }
+}
+
+// ========================================================================
+// 3. FONCTIONS UTILITAIRES
+// ========================================================================
+
+function generateMultiPublicationsDescription(publicationsPayantes) {
+    if (publicationsPayantes.length === 0) return 'Prestations publicitaires';
+    
+    // Grouper par format
+    const formatGroups = {};
+    publicationsPayantes.forEach(pub => {
+        if (!formatGroups[pub.format]) {
+            formatGroups[pub.format] = [];
+        }
+        formatGroups[pub.format].push(pub.mois);
+    });
+    
+    // Générer description par format
+    const descriptions = Object.entries(formatGroups).map(([format, mois]) => {
+        if (mois.length === 1) {
+            return `${format} ${mois[0]}`;
+        } else {
+            return `${format} (${mois.join(', ')})`;
+        }
+    });
+    
+    return `Insertions publicitaires: ${descriptions.join(' + ')} - Calendrier 2026`;
+}
+
+function findMostUsedFormat(publications) {
+    const formatCounts = {};
+    publications.forEach(pub => {
+        formatCounts[pub.format] = (formatCounts[pub.format] || 0) + 1;
+    });
+    
+    return Object.keys(formatCounts).reduce((a, b) => 
+        formatCounts[a] > formatCounts[b] ? a : b
+    ) || '6X4';
+}
+
+// ========================================================================
+// 4. FONCTION UTILITAIRE - Génération numéro de document
+// ========================================================================
+
+function generateDocumentNumber(type) {
+    const prefix = type === 'facture' ? 'FA' : 'BC';
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const time = String(date.getTime()).slice(-6);
+    
+    return `${prefix}-${year}-${month}${day}-${time}`;
+}
