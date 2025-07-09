@@ -103,19 +103,8 @@ class StatsManager {
             }
 
             // 🔧 CORRECTION : Extraction correcte des données
-            let statsData;
-            
-            if (Array.isArray(response.data) && response.data.length > 0) {
-                // Cas où les données sont dans un tableau
-                statsData = response.data[0].data || response.data[0];
-                console.log('📊 Données extraites du tableau:', statsData);
-            } else if (response.data && typeof response.data === 'object') {
-                // Cas où les données sont directement dans data
-                statsData = response.data;
-                console.log('📊 Données directes:', statsData);
-            } else {
-                throw new Error('Format de données inattendu');
-            }
+            const statsData = response.data;
+            console.log('📊 Données extraites:', statsData);
 
             // 🔧 Validation des données critiques
             if (!statsData || typeof statsData !== 'object') {
@@ -159,10 +148,10 @@ class StatsManager {
             });
             
             // Mise à jour sécurisée des éléments DOM
-            this.updateElementSafely('totalPartenaires2025', totalPartenaires);
-            this.updateElementSafely('dejaRenouveles', dejaRenouveles);
-            this.updateElementSafely('enAttente', enAttente);
-            this.updateElementSafely('tauxRenouvellement', `${tauxRenouvellement}%`);
+            this.updateElementSafely('totalPartenaires2025', formatNumber(totalPartenaires));
+            this.updateElementSafely('dejaRenouveles', formatNumber(dejaRenouveles));
+            this.updateElementSafely('enAttente', formatNumber(enAttente));
+            this.updateElementSafely('tauxRenouvellement', formatPercentage(tauxRenouvellement));
             
         } catch (error) {
             console.error('❌ Erreur mise à jour métriques:', error);
@@ -326,10 +315,10 @@ class StatsManager {
 
     // Affichage d'erreur de fallback
     displayErrorFallback() {
-        this.updateElementSafely('totalPartenaires2025', 'Erreur');
-        this.updateElementSafely('dejaRenouveles', 'Erreur');
-        this.updateElementSafely('enAttente', 'Erreur');
-        this.updateElementSafely('tauxRenouvellement', 'Erreur');
+        this.updateElementSafely('totalPartenaires2025', '--');
+        this.updateElementSafely('dejaRenouveles', '--');
+        this.updateElementSafely('enAttente', '--');
+        this.updateElementSafely('tauxRenouvellement', '--%');
         
         const container = document.getElementById('actionsRecommandees');
         if (container) {

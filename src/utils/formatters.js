@@ -106,3 +106,17 @@ export function formatEmail(email) {
     if (!email) return '';
     return email.toLowerCase().trim();
 }
+
+// Formate un nombre avec séparateurs de milliers
+export function formatNumber(number) {
+    if (number === null || number === undefined || isNaN(number)) return 0;
+    return new Intl.NumberFormat('fr-FR').format(number);
+}
+
+// Formate un pourcentage avec validation
+export function formatPercentage(percentage) {
+    if (percentage === null || percentage === undefined || isNaN(percentage)) return '0%';
+    const num = parseFloat(percentage);
+    if (isNaN(num)) return '0%';
+    return `${num.toFixed(1)}%`;
+}
