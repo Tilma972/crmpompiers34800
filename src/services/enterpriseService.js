@@ -49,8 +49,12 @@ class EnterpriseService {
         
         console.log('🔍 [enterpriseService] Réponse reçue:', response);
         
-        if (response.success) {
+        // ✅ CORRIGÉ : Validation du payload avant mise en cache
+        if (response.success && response.data && Array.isArray(response.data)) {
             this.cache.set(cacheKey, response.data);
+            console.log('✅ Cache mis à jour:', response.data.length, 'entreprises');
+        } else if (response.success) {
+            console.warn('⚠️ Réponse success mais data invalide:', response.data);
         }
 
         return response;
@@ -230,7 +234,7 @@ class EnterpriseService {
         return baserowData;
     }
 
-    // ✅ CORRECTION : Mapping avec protection contre les champs manquants
+    // ✅ CORRECTION : Mapping corrigé pour le payload réel
     mapFromBaserowFields(baserowData) {
         if (!baserowData) return null;
 
@@ -240,25 +244,35 @@ class EnterpriseService {
             id: baserowData.id,
             nom: baserowData.nom_entreprise || 'Nom non spécifié',
             nom_entreprise: baserowData.nom_entreprise || 'Nom non spécifié',
-            adresse: baserowData.adresse || baserowData.Adresse || '',
-            commune: baserowData.commune || this.getCommuneLabel(baserowData.Commune) || '',
-            ville: baserowData.commune || this.getCommuneLabel(baserowData.Commune) || '', // Alias
-            telephone: baserowData.telephone || baserowData.Telephone || '',
+            
+            // ✅ CORRIGÉ : Adresse directe du payload
+            adresse: baserowData.adresse || '',
+            
+            // ✅ CORRIGÉ : Commune directe du payload (pas de conversion nécessaire)
+            commune: baserowData.commune || '',
+            ville: baserowData.commune || '', // Alias pour compatibilité
+            
+            // ✅ CORRIGÉ : Téléphone direct du payload
+            telephone: baserowData.telephone || '',
             portable: baserowData.portable || '',
             email: baserowData.email || '',
             interlocuteur: baserowData.interlocuteur || '',
-            activite: baserowData.activite || baserowData.Activitée || '',
-            secteur_activite: baserowData.activite || baserowData.Activitée || '', // Alias
             
-            // Nouveaux champs de ton workflow
+            // ✅ CORRIGÉ : Activité directe du payload (même si vide)
+            activite: baserowData.activite || '',
+            secteur_activite: baserowData.activite || '', // Alias
+            
+            // ✅ CORRIGÉ : Statut direct du payload
             statut: baserowData.statut || 'actif',
+            
+            // Champs workflow directs du payload
             format_encart_2025: baserowData.format_encart_2025 || '',
             mois_parution_2025: baserowData.mois_parution_2025 || '',
             client_2025: baserowData.client_2025 || '',
             prospecteur_2024: baserowData.prospecteur_2024 || '',
             
             // Champs calculés/virtuels
-            code_postal: '', // Pas disponible dans Baserow
+            code_postal: '', // Pas disponible dans le payload
             date_creation: baserowData.created_at || null,
             commentaires: baserowData.commentaires || ''
         };
