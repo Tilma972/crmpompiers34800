@@ -9,7 +9,7 @@ import { UI_ELEMENTS, ACTIONS } from './src/config/constants.js';
 
 // Imports des utilitaires
 import { updateStatus, initializeUserInterface, showAutoFillStatus } from './src/utils/ui.js';
-import { formatPrice, getActionLabel } from './src/utils/formatters.js';
+import { formatPrice, getActionLabel, formatNumber, formatPercentage } from './src/utils/formatters.js';
 
 // Imports des services
 import { enterpriseService } from './src/services/enterpriseService.js';
@@ -517,6 +517,13 @@ window.publicationsManager = publicationsManager;
 window.statsManager = statsManager;
 window.smartOffersManager = smartOffersManager;
 window.autoFillManager = autoFillManager;
+
+// Exposition des fonctions de formatage
+window.formatNumber = formatNumber;
+window.formatPercentage = formatPercentage;
+
+// Exposition des fonctions Telegram
+window.getTelegramUser = getTelegramUser;
 
 // ================================
 // 🚀 DÉMARRAGE DE L'APPLICATION
