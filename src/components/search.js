@@ -42,13 +42,15 @@ class SearchManager {
             
             const response = await enterpriseService.smartSearch(query, { limit: 10 });
             
-            if (response.success) {
+            console.log('🔍 Response dans performSearch:', response);
+            
+            if (response.success && response.data && Array.isArray(response.data)) {
                 this.currentSearchResults = response.data;
                 this.displaySearchResults(response.data, response.source);
                 updateStatus(`${response.data.length} résultat(s) trouvé(s)`);
             } else {
-                this.displaySearchError(response.error);
-                updateStatus('❌ Erreur de recherche');
+                this.displaySearchError(response.error || 'Aucun résultat');
+                updateStatus('❌ Aucun résultat');
             }
         } catch (error) {
             console.error('Erreur lors de la recherche:', error);

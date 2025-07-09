@@ -548,8 +548,16 @@ window.testApiCall = async function() {
         console.log('🧪 Response status:', response.status);
         console.log('🧪 Response headers:', Object.fromEntries(response.headers.entries()));
         
-        const data = await response.json();
-        console.log('🧪 Response data:', data);
+        const responseText = await response.text();
+        console.log('🧪 Response text:', responseText);
+        
+        try {
+            const data = JSON.parse(responseText);
+            console.log('🧪 Response data:', data);
+        } catch (parseError) {
+            console.log('🧪 JSON parse error:', parseError);
+            console.log('🧪 Raw response was:', responseText);
+        }
     } catch (error) {
         console.error('🧪 Error:', error);
     }
@@ -586,6 +594,24 @@ window.testSearch = async function() {
         // Test de smartSearch
         const smartResult = await window.enterpriseService?.smartSearch('drone', {limit: 3});
         console.log('🧠 Résultat smartSearch:', smartResult);
+        
+        // Test de la fonction de recherche via l'interface
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            console.log('🔍 Test recherche via interface...');
+            searchInput.value = 'drone';
+            window.handleSearch('drone');
+            
+            // Vérifier l'affichage après un délai
+            setTimeout(() => {
+                const resultsDiv = document.getElementById('searchResults');
+                if (resultsDiv) {
+                    console.log('🔍 Contenu div résultats:', resultsDiv.innerHTML);
+                    console.log('🔍 Style display:', resultsDiv.style.display);
+                    console.log('🔍 Classes CSS:', resultsDiv.className);
+                }
+            }, 1000);
+        }
         
     } catch (error) {
         console.error('❌ Erreur test recherche:', error);
