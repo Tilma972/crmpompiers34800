@@ -91,27 +91,43 @@ class SearchManager {
         `;
     }
 
-    // Crée une carte d'entreprise
+    // Version simplifiée qui MARCHE
     createEnterpriseCard(enterprise, index) {
-        const name = formatEnterpriseName(enterprise.nom || enterprise.name || 'Sans nom');
-        const address = this.formatAddress(enterprise);
-        const phone = enterprise.telephone || enterprise.phone || '';
+        console.log('🏢 Création carte pour:', enterprise);
+        
+        // Protection contre les données manquantes
+        const name = enterprise.nom_entreprise || enterprise.nom || enterprise.name || 'Nom non disponible';
+        const commune = enterprise.commune || enterprise.ville || 'Commune inconnue';
+        const interlocuteur = enterprise.interlocuteur || enterprise.contact || 'Contact non disponible';
+        const telephone = enterprise.telephone || enterprise.phone || '';
         const email = enterprise.email || '';
-        const comments = enterprise.commentaires || enterprise.comments || '';
+        
+        console.log('🏢 Données extraites:', { name, commune, interlocuteur });
         
         return `
-            <div class="enterprise-card" onclick="window.searchManager.selectEnterprise(${index})">
+            <div class="enterprise-card" onclick="window.searchManager.selectEnterprise(${index})" style="
+                padding: 12px;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                margin: 8px 0;
+                background: white;
+                cursor: pointer;
+                transition: all 0.2s ease;
+            " onmouseover="this.style.background='#f0f8ff'" onmouseout="this.style.background='white'">
                 <div class="enterprise-header">
-                    <h4 class="enterprise-name">${name}</h4>
-                    <div class="enterprise-actions">
-                        <button class="btn-icon" title="Sélectionner">✓</button>
-                    </div>
+                    <h4 class="enterprise-name" style="margin: 0 0 8px 0; color: #1d3557; font-size: 16px;">
+                        ${name}
+                    </h4>
                 </div>
-                <div class="enterprise-details">
-                    ${address ? `<div class="enterprise-address">📍 ${address}</div>` : ''}
-                    ${phone ? `<div class="enterprise-phone">📞 ${phone}</div>` : ''}
-                    ${email ? `<div class="enterprise-email">✉️ ${email}</div>` : ''}
-                    ${comments ? `<div class="enterprise-comments">💬 ${comments}</div>` : ''}
+                <div class="enterprise-details" style="font-size: 14px; color: #666;">
+                    <div class="enterprise-address" style="margin: 4px 0;">
+                        📍 ${commune}
+                    </div>
+                    <div class="enterprise-contact" style="margin: 4px 0;">
+                        👤 ${interlocuteur}
+                    </div>
+                    ${telephone ? `<div class="enterprise-phone" style="margin: 4px 0;">📞 ${telephone}</div>` : ''}
+                    ${email ? `<div class="enterprise-email" style="margin: 4px 0;">✉️ ${email}</div>` : ''}
                 </div>
             </div>
         `;

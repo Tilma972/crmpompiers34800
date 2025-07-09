@@ -582,7 +582,47 @@ window.debugInterface = function() {
     }
 };
 
-// 🔍 FONCTION DE TEST RECHERCHE
+// 🔍 FONCTION DE TEST RECHERCHE COMPLÈTE
+window.testSearchComplete = async function() {
+    console.log('🔍 TEST RECHERCHE COMPLÈTE:');
+    
+    try {
+        // 1. Aller à l'interface de recherche
+        console.log('🔍 Étape 1: Accès interface recherche');
+        window.showSearch();
+        
+        // 2. Attendre que l'interface se charge
+        setTimeout(async () => {
+            console.log('🔍 Étape 2: Test recherche');
+            
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.value = 'drone';
+                window.handleSearch('drone');
+                
+                // 3. Vérifier l'affichage
+                setTimeout(() => {
+                    const resultsDiv = document.getElementById('searchResults');
+                    if (resultsDiv) {
+                        console.log('✅ RÉSULTATS VISIBLES:', resultsDiv.innerHTML.length > 0);
+                        console.log('✅ INTERFACE AFFICHÉE:', !resultsDiv.style.display || resultsDiv.style.display !== 'none');
+                        
+                        // Forcer l'affichage si nécessaire
+                        if (resultsDiv.style.display === 'none') {
+                            resultsDiv.style.display = 'block';
+                            console.log('✅ Affichage forcé');
+                        }
+                    }
+                }, 1000);
+            }
+        }, 500);
+        
+    } catch (error) {
+        console.error('❌ Erreur test recherche complète:', error);
+    }
+};
+
+// 🔍 FONCTION DE TEST RECHERCHE (version originale)
 window.testSearch = async function() {
     console.log('🔍 TEST RECHERCHE:');
     
