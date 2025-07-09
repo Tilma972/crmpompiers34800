@@ -175,27 +175,35 @@ class EnterpriseService {
         return baserowData;
     }
 
-    // ✅ NOUVEAU : Mapping depuis champs Baserow vers format standard
+    // ✅ CORRECTION : Mapping avec protection contre les champs manquants
     mapFromBaserowFields(baserowData) {
         if (!baserowData) return null;
+
+        console.log('🔄 Mapping Baserow data:', Object.keys(baserowData));
 
         return {
             id: baserowData.id,
             nom: baserowData.nom_entreprise || 'Nom non spécifié',
             nom_entreprise: baserowData.nom_entreprise || 'Nom non spécifié',
-            adresse: baserowData.Adresse || '',
-            commune: this.getCommuneLabel(baserowData.Commune) || '',
-            ville: this.getCommuneLabel(baserowData.Commune) || '', // Alias pour compatibilité
-            telephone: baserowData.Telephone || '',
+            adresse: baserowData.adresse || baserowData.Adresse || '',
+            commune: baserowData.commune || this.getCommuneLabel(baserowData.Commune) || '',
+            ville: baserowData.commune || this.getCommuneLabel(baserowData.Commune) || '', // Alias
+            telephone: baserowData.telephone || baserowData.Telephone || '',
             portable: baserowData.portable || '',
             email: baserowData.email || '',
             interlocuteur: baserowData.interlocuteur || '',
-            activite: baserowData.Activitée || '',
-            secteur_activite: baserowData.Activitée || '', // Alias pour compatibilité
+            activite: baserowData.activite || baserowData.Activitée || '',
+            secteur_activite: baserowData.activite || baserowData.Activitée || '', // Alias
             
-            // Champs calculés/virtuels pour compatibilité
+            // Nouveaux champs de ton workflow
+            statut: baserowData.statut || 'actif',
+            format_encart_2025: baserowData.format_encart_2025 || '',
+            mois_parution_2025: baserowData.mois_parution_2025 || '',
+            client_2025: baserowData.client_2025 || '',
+            prospecteur_2024: baserowData.prospecteur_2024 || '',
+            
+            // Champs calculés/virtuels
             code_postal: '', // Pas disponible dans Baserow
-            statut: 'actif', // Valeur par défaut
             date_creation: baserowData.created_at || null,
             commentaires: baserowData.commentaires || ''
         };
@@ -304,33 +312,53 @@ class EnterpriseService {
         return this.mapFromBaserowFields(enterprise);
     }
 
-    // ✅ CORRECTION : Recherche intelligente avec mapping
+    // ✅ CORRECTION : Méthode smartSearch corrigée
     async smartSearch(query, options = {}) {
+        console.log('🧠 SmartSearch appelée avec:', query, options);
+        
+        // 1. Essayer d'abord la recherche normale
         const results = await this.searchEnterprises(query, options);
         
-        if (results.success && results.data) {
-            // Applique le mapping sur tous les résultats
-            results.data = results.data.map(enterprise => this.mapFromBaserowFields(enterprise));
+        console.log('🔍 Résultat searchEnterprises:', results);
+        
+        if (results.success && results.data && Array.isArray(results.data)) {
+            // ✅ CORRECTION : Mapper les résultats seulement s'ils existent
+            const mappedData = results.data.map(enterprise => this.mapFromBaserowFields(enterprise));
+            
+            console.log('✅ Données mappées:', mappedData.length, 'entreprises');
+            
+            return {
+                success: true,
+                data: mappedData,
+                source: 'enterprises'
+            };
         }
         
-        if (!results.success || !results.data || results.data.length === 0) {
-            // Essayer une recherche par entités
+        // 2. Si pas de résultats, essayer la recherche par entités
+        console.log('⚠️ Pas de résultats enterprises, tentative entities...');
+        
+        try {
             const entityResults = await this.searchEntities(query, options);
-            if (entityResults.success && entityResults.data) {
-                // Applique le mapping sur les entités aussi
-                entityResults.data = entityResults.data.map(entity => this.mapFromBaserowFields(entity));
+            
+            if (entityResults.success && entityResults.data && Array.isArray(entityResults.data)) {
+                const mappedEntityData = entityResults.data.map(entity => this.mapFromBaserowFields(entity));
                 
                 return {
                     success: true,
-                    data: entityResults.data,
+                    data: mappedEntityData,
                     source: 'entities'
                 };
             }
+        } catch (entityError) {
+            console.error('❌ Erreur recherche entities:', entityError);
         }
-
+        
+        // 3. Retourner le résultat original si tout échoue
         return {
-            ...results,
-            source: 'enterprises'
+            success: results.success || false,
+            data: [],
+            source: 'fallback',
+            error: results.error || 'Aucun résultat trouvé'
         };
     }
 
