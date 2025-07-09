@@ -185,8 +185,7 @@ export const ApiUtils = {
     prepareRequestData(data, additionalData = {}) {
         return {
             ...ApiUtils.sanitizeData(data),
-            ...additionalData,
-            timestamp: new Date().toISOString()
+            ...additionalData            
         };
     },
 
