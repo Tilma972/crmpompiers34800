@@ -518,6 +518,9 @@ window.statsManager = statsManager;
 window.smartOffersManager = smartOffersManager;
 window.autoFillManager = autoFillManager;
 
+// Exposition des services pour les tests
+window.enterpriseService = enterpriseService;
+
 // Exposition des fonctions de formatage
 window.formatNumber = formatNumber;
 window.formatPercentage = formatPercentage;
@@ -549,6 +552,43 @@ window.testApiCall = async function() {
         console.log('🧪 Response data:', data);
     } catch (error) {
         console.error('🧪 Error:', error);
+    }
+};
+
+// 🔍 FONCTION DE DIAGNOSTIC INTERFACE
+window.debugInterface = function() {
+    console.log('🔍 DIAGNOSTIC INTERFACE:');
+    console.log('searchResults:', !!document.getElementById('searchResults'));
+    console.log('enterpriseResults:', !!document.getElementById('enterpriseResults'));
+    console.log('searchInput:', !!document.getElementById('searchInput'));
+    console.log('stateContent:', !!document.getElementById('stateContent'));
+    
+    // Test d'affichage forcé
+    const resultsDiv = document.getElementById('searchResults') || document.getElementById('enterpriseResults');
+    if (resultsDiv) {
+        resultsDiv.innerHTML = '<div style="padding: 10px; background: green; color: white;">🎯 TEST AFFICHAGE RÉUSSI</div>';
+        resultsDiv.style.display = 'block';
+        console.log('✅ Test affichage injecté');
+    } else {
+        console.log('❌ Aucun div de résultats trouvé');
+    }
+};
+
+// 🔍 FONCTION DE TEST RECHERCHE
+window.testSearch = async function() {
+    console.log('🔍 TEST RECHERCHE:');
+    
+    try {
+        // Test direct du service
+        const result = await window.enterpriseService?.searchEnterprises('drone', {limit: 3});
+        console.log('📊 Résultat searchEnterprises:', result);
+        
+        // Test de smartSearch
+        const smartResult = await window.enterpriseService?.smartSearch('drone', {limit: 3});
+        console.log('🧠 Résultat smartSearch:', smartResult);
+        
+    } catch (error) {
+        console.error('❌ Erreur test recherche:', error);
     }
 };
 
