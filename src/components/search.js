@@ -61,34 +61,48 @@ class SearchManager {
 
     // Affiche les résultats de recherche
     displaySearchResults(results, source = 'enterprises') {
-        const resultsDiv = document.getElementById(UI_ELEMENTS.SEARCH_RESULTS);
+        console.log('🎨 DÉBUT displaySearchResults:', results.length, 'résultats');
+        
+        // ✅ DIAGNOSTIC DES ÉLÉMENTS
+        const searchResults = document.getElementById('searchResults');
+        const enterpriseResults = document.getElementById('enterpriseResults');
+        
+        console.log('🎨 searchResults existe:', !!searchResults);
+        console.log('🎨 enterpriseResults existe:', !!enterpriseResults);
+        console.log('🎨 UI_ELEMENTS.SEARCH_RESULTS:', UI_ELEMENTS.SEARCH_RESULTS);
+        
+        // ✅ UTILISE LE BON ÉLÉMENT
+        const resultsDiv = searchResults || enterpriseResults;
         
         if (!resultsDiv) {
-            console.error('Élément de résultats de recherche non trouvé');
+            console.error('❌ AUCUN élément de résultats trouvé !');
             return;
         }
-
-        if (!results || results.length === 0) {
-            resultsDiv.innerHTML = `
-                <div class="search-no-results">
-                    <div class="no-results-icon">🔍</div>
-                    <h3>Aucun résultat trouvé</h3>
-                    <p>Essayez avec d'autres mots-clés</p>
-                </div>
-            `;
-            return;
-        }
-
-        const sourceLabel = source === 'entities' ? 'Entités externes' : 'Base de données';
         
-        resultsDiv.innerHTML = `
+        console.log('🎨 Utilisation de l\'élément:', resultsDiv.id);
+        
+        if (!results || results.length === 0) {
+            resultsDiv.innerHTML = '<div class="search-no-results">Aucun résultat</div>';
+            return;
+        }
+
+        const htmlContent = `
             <div class="search-results-header">
-                <h3>📊 ${results.length} résultat(s) - ${sourceLabel}</h3>
+                <h3>📊 ${results.length} résultat(s)</h3>
             </div>
             <div class="search-results-list">
                 ${results.map((enterprise, index) => this.createEnterpriseCard(enterprise, index)).join('')}
             </div>
         `;
+        
+        console.log('🎨 HTML généré, longueur:', htmlContent.length);
+        
+        resultsDiv.innerHTML = htmlContent;
+        resultsDiv.style.display = 'block';
+        resultsDiv.style.visibility = 'visible';
+        
+        console.log('🎨 HTML injecté dans:', resultsDiv.id);
+        console.log('🎨 Contenu final:', resultsDiv.innerHTML.substring(0, 100));
     }
 
     // Version simplifiée qui MARCHE

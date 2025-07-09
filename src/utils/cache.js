@@ -127,13 +127,19 @@ export function createSearchDebouncer(callback, delay = 300) {
     let lastQuery = '';
     
     return function(query) {
-        // Si la requête est identique, ignore
-        if (query === lastQuery) return;
-        
-        lastQuery = query;
+        // ✅ CORRECTION : Nettoie toujours le timeout précédent
         clearTimeout(timeoutId);
         
+        // Si la requête est identique ET récente, ignore
+        if (query === lastQuery) {
+            console.log('🔄 Requête identique ignorée:', query);
+            return;
+        }
+        
+        lastQuery = query;
+        
         timeoutId = setTimeout(() => {
+            console.log('⚡ Exécution recherche après debounce:', query);
             callback(query);
         }, delay);
     };
