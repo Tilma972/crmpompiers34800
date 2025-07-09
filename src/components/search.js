@@ -26,13 +26,15 @@ class SearchManager {
 
         const trimmedQuery = query.trim();
         
-        // Évite les recherches identiques
-        if (trimmedQuery === this.lastSearchQuery) {
-            return;
-        }
-
-        this.lastSearchQuery = trimmedQuery;
-        this.searchDebouncer(trimmedQuery);
+        // ✅ CORRECTION : Debounce simplifié
+        clearTimeout(this.searchTimeout);
+        
+        this.searchTimeout = setTimeout(() => {
+            if (trimmedQuery !== this.lastSearchQuery) {
+                this.lastSearchQuery = trimmedQuery;
+                this.performSearch(trimmedQuery);
+            }
+        }, 300);
     }
 
     // Effectue la recherche
@@ -63,32 +65,31 @@ class SearchManager {
     displaySearchResults(results, source = 'enterprises') {
         console.log('🎨 DÉBUT displaySearchResults:', results.length, 'résultats');
         
-        // ✅ DIAGNOSTIC DES ÉLÉMENTS
-        const searchResults = document.getElementById('searchResults');
-        const enterpriseResults = document.getElementById('enterpriseResults');
-        
-        console.log('🎨 searchResults existe:', !!searchResults);
-        console.log('🎨 enterpriseResults existe:', !!enterpriseResults);
-        console.log('🎨 UI_ELEMENTS.SEARCH_RESULTS:', UI_ELEMENTS.SEARCH_RESULTS);
-        
-        // ✅ UTILISE LE BON ÉLÉMENT
-        const resultsDiv = searchResults || enterpriseResults;
+        // ✅ CORRECTION : Utilise directement 'searchResults' au lieu de UI_ELEMENTS
+        const resultsDiv = document.getElementById('searchResults');
         
         if (!resultsDiv) {
-            console.error('❌ AUCUN élément de résultats trouvé !');
-            return;
-        }
-        
-        console.log('🎨 Utilisation de l\'élément:', resultsDiv.id);
-        
-        if (!results || results.length === 0) {
-            resultsDiv.innerHTML = '<div class="search-no-results">Aucun résultat</div>';
+            console.error('❌ Élément searchResults non trouvé');
             return;
         }
 
+        if (!results || results.length === 0) {
+            resultsDiv.innerHTML = `
+                <div class="search-no-results">
+                    <div class="no-results-icon">🔍</div>
+                    <h3>Aucun résultat trouvé</h3>
+                    <p>Essayez avec d'autres mots-clés</p>
+                </div>
+            `;
+            resultsDiv.style.display = 'block';
+            return;
+        }
+
+        const sourceLabel = source === 'entities' ? 'Entités externes' : 'Base de données';
+        
         const htmlContent = `
             <div class="search-results-header">
-                <h3>📊 ${results.length} résultat(s)</h3>
+                <h3>📊 ${results.length} résultat(s) - ${sourceLabel}</h3>
             </div>
             <div class="search-results-list">
                 ${results.map((enterprise, index) => this.createEnterpriseCard(enterprise, index)).join('')}
@@ -101,8 +102,7 @@ class SearchManager {
         resultsDiv.style.display = 'block';
         resultsDiv.style.visibility = 'visible';
         
-        console.log('🎨 HTML injecté dans:', resultsDiv.id);
-        console.log('🎨 Contenu final:', resultsDiv.innerHTML.substring(0, 100));
+        console.log('🎨 ✅ Contenu injecté avec succès !');
     }
 
     // Version simplifiée qui MARCHE
