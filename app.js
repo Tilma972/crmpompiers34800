@@ -673,6 +673,36 @@ window.debugInterface = function() {
     }
 };
 
+// 🔍 FONCTION DE DIAGNOSTIC SAISIE
+window.debugSearchInput = function() {
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        console.log('🔍 DIAGNOSTIC CHAMP RECHERCHE:');
+        console.log('Element trouvé:', !!searchInput);
+        console.log('Disabled:', searchInput.disabled);
+        console.log('ReadOnly:', searchInput.readOnly);
+        console.log('Value:', searchInput.value);
+        console.log('Style display:', searchInput.style.display);
+        console.log('Style visibility:', searchInput.style.visibility);
+        console.log('TabIndex:', searchInput.tabIndex);
+        console.log('Focused:', document.activeElement === searchInput);
+        
+        // Test de focus forcé
+        searchInput.focus();
+        console.log('✅ Focus forcé appliqué');
+        
+        // Test de saisie forcée
+        searchInput.value = 'test';
+        console.log('✅ Valeur test injectée:', searchInput.value);
+        
+        // Test d'événement
+        searchInput.dispatchEvent(new Event('input'));
+        console.log('✅ Événement input déclenché');
+    } else {
+        console.log('❌ Champ searchInput non trouvé');
+    }
+};
+
 // 🔍 FONCTION DE TEST RECHERCHE COMPLÈTE
 window.testSearchComplete = async function() {
     console.log('🔍 TEST RECHERCHE COMPLÈTE:');
