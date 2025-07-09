@@ -2,13 +2,26 @@ import { apiService, ApiUtils } from './api.js';
 import { enterpriseCache, CacheUtils } from '../utils/cache.js';
 import { validateEnterpriseName, validateEmail, validatePhoneNumber } from '../utils/validators.js';
 
-// Service pour la gestion des entreprises - VERSION CORRIGÉE BASEROW
+// ==========================================
+// 🔧 CONSTANTES D'ENDPOINTS
+// ==========================================
+const ENDPOINTS = {
+    SEARCH: 'RECHERCHE_ENTREPRISE',    // Pour toute recherche
+    ACTIONS: 'GATEWAY_ENTITIES'        // Pour toute action CRUD
+};
+
+// Service pour la gestion des entreprises - VERSION RESTRUCTURÉE
 class EnterpriseService {
     constructor() {
         this.cache = enterpriseCache;
     }
 
-    // ✅ CORRECTION : Recherche avec format n8n correct
+    // ==========================================
+    // 🔍 FONCTIONS DE RECHERCHE
+    // Endpoint: RECHERCHE_ENTREPRISE
+    // ==========================================
+    
+    // ✅ CORRECTION : Recherche avec endpoint unifié
     async searchEnterprises(query, options = {}) {
         if (!query || query.trim().length < 2) {
             return { success: false, error: 'Requête trop courte' };
@@ -29,10 +42,10 @@ class EnterpriseService {
         };
 
         // 🔍 AJOUT DE LOGS DE DIAGNOSTIC
-        console.log('🔍 [enterpriseService] URL appelée:', 'ENTERPRISE_API');
+        console.log('🔍 [enterpriseService] Endpoint appelé:', ENDPOINTS.SEARCH);
         console.log('🔍 [enterpriseService] Data envoyée:', JSON.stringify(searchData));
         
-        const response = await apiService.callWebhook('ENTERPRISE_API', searchData);
+        const response = await apiService.callWebhook(ENDPOINTS.SEARCH, searchData);
         
         console.log('🔍 [enterpriseService] Réponse reçue:', response);
         
@@ -43,7 +56,7 @@ class EnterpriseService {
         return response;
     }
 
-    // ✅ CORRECTION : Recherche par ID avec bon format
+    // ✅ CORRECTION : Recherche par ID avec endpoint unifié
     async getEnterpriseById(id) {
         if (!id) {
             return { success: false, error: 'ID entreprise requis' };
@@ -62,7 +75,7 @@ class EnterpriseService {
             id: id
         };
 
-        const response = await apiService.callWebhook('ENTERPRISE_API', searchData);
+        const response = await apiService.callWebhook(ENDPOINTS.SEARCH, searchData);
         
         if (response.success) {
             this.cache.set(cacheKey, response.data);
@@ -71,22 +84,58 @@ class EnterpriseService {
         return response;
     }
 
-    // ✅ CORRECTION : Création avec bon format
+    // ✅ CORRECTION : Version simplifiée et cohérente
+    async smartSearch(query, options = {}) {
+        console.log('🧠 SmartSearch appelée avec:', query, options);
+        
+        // Recherche unique via RECHERCHE_ENTREPRISE
+        const results = await this.searchEnterprises(query, options);
+        
+        if (results.success && results.data && Array.isArray(results.data)) {
+            const mappedData = results.data.map(enterprise => 
+                this.mapFromBaserowFields(enterprise)
+            );
+            
+            return {
+                success: true,
+                data: mappedData,
+                source: 'enterprises'
+            };
+        }
+        
+        return {
+            success: false,
+            data: [],
+            source: 'enterprises',
+            error: results.error || 'Aucun résultat trouvé'
+        };
+    }
+
+    // ==========================================
+    // 🏗️ FONCTIONS D'ACTIONS CRUD
+    // Endpoint: GATEWAY_ENTITIES
+    // ==========================================
+    
+    // ✅ CORRIGÉ : Utiliser GATEWAY_ENTITIES
     async createEnterprise(enterpriseData) {
         const validation = this.validateEnterpriseData(enterpriseData);
         if (!validation.valid) {
             return { success: false, error: validation.errors.join(', ') };
         }
 
-        // ✅ CORRECTION : Mapping des champs Baserow
-        const baserowData = this.mapToBaserowFields(enterpriseData);
-        
         const requestData = {
-            operation: "create",
-            data: baserowData
+            action: 'nouvelle_entreprise',
+            data: {
+                nom_entreprise: enterpriseData.nom_entreprise || enterpriseData.nom,
+                commune: enterpriseData.commune,
+                adresse: enterpriseData.adresse,
+                telephone: enterpriseData.telephone,
+                email: enterpriseData.email,
+                interlocuteur: enterpriseData.interlocuteur || enterpriseData.contact
+            }
         };
 
-        const response = await apiService.callWebhook('FORM_ENTREPRISE', requestData);
+        const response = await apiService.callWebhook(ENDPOINTS.ACTIONS, requestData);
         
         // Invalide le cache des recherches
         if (response.success) {
@@ -96,7 +145,7 @@ class EnterpriseService {
         return response;
     }
 
-    // ✅ CORRECTION : Mise à jour avec bon format
+    // ✅ CORRIGÉ : Mise à jour avec GATEWAY_ENTITIES
     async updateEnterprise(id, updateData) {
         if (!id) {
             return { success: false, error: 'ID entreprise requis' };
@@ -107,16 +156,15 @@ class EnterpriseService {
             return { success: false, error: validation.errors.join(', ') };
         }
 
-        // ✅ CORRECTION : Mapping des champs Baserow
-        const baserowData = this.mapToBaserowFields(updateData);
-        
         const requestData = {
-            operation: "update",
-            id: id,
-            data: baserowData
+            action: 'modifier_entreprise',
+            data: {
+                id: id,
+                ...updateData
+            }
         };
 
-        const response = await apiService.callWebhook('FORM_ENTREPRISE', requestData);
+        const response = await apiService.callWebhook(ENDPOINTS.ACTIONS, requestData);
         
         // Invalide le cache
         if (response.success) {
@@ -127,18 +175,20 @@ class EnterpriseService {
         return response;
     }
 
-    // ✅ CORRECTION : Suppression avec bon format
+    // ✅ CORRIGÉ : Suppression avec GATEWAY_ENTITIES
     async deleteEnterprise(id) {
         if (!id) {
             return { success: false, error: 'ID entreprise requis' };
         }
 
         const requestData = {
-            operation: "delete",
-            id: id
+            action: 'supprimer_entreprise',
+            data: {
+                id: id
+            }
         };
 
-        const response = await apiService.callWebhook('FORM_ENTREPRISE', requestData);
+        const response = await apiService.callWebhook(ENDPOINTS.ACTIONS, requestData);
         
         // Invalide le cache
         if (response.success) {
@@ -148,6 +198,11 @@ class EnterpriseService {
         return response;
     }
 
+    // ==========================================
+    // 🔄 FONCTIONS DE MAPPING
+    // Compatibilité Baserow
+    // ==========================================
+    
     // ✅ NOUVEAU : Mapping vers champs Baserow réels
     mapToBaserowFields(inputData) {
         const baserowData = {};
@@ -254,23 +309,9 @@ class EnterpriseService {
         return mapping[communeId] || '';
     }
 
-    // ✅ CORRECTION : Recherche entités avec bon format
-    async searchEntities(query, options = {}) {
-        if (!query || query.trim().length < 2) {
-            return { success: false, error: 'Requête trop courte' };
-        }
-
-        // 🔧 CORRECTION : Format unifié pour toutes les recherches
-        const searchData = {
-            operation: 'getMany',
-            search: query.trim(),
-            limit: options.limit || 10
-        };
-        
-        console.log('🔍 [searchEntities] Data envoyée:', JSON.stringify(searchData));
-
-        return apiService.callWebhook('GATEWAY_ENTITIES', searchData);
-    }
+    // ==========================================
+    // 🔧 FONCTIONS UTILITAIRES
+    // ==========================================
 
     // ✅ CORRECTION : Validation avec champs Baserow
     validateEnterpriseData(data, required = true) {
@@ -312,56 +353,6 @@ class EnterpriseService {
         return this.mapFromBaserowFields(enterprise);
     }
 
-    // ✅ CORRECTION : Méthode smartSearch corrigée
-    async smartSearch(query, options = {}) {
-        console.log('🧠 SmartSearch appelée avec:', query, options);
-        
-        // 1. Essayer d'abord la recherche normale
-        const results = await this.searchEnterprises(query, options);
-        
-        console.log('🔍 Résultat searchEnterprises:', results);
-        
-        if (results.success && results.data && Array.isArray(results.data)) {
-            // ✅ CORRECTION : Mapper les résultats seulement s'ils existent
-            const mappedData = results.data.map(enterprise => this.mapFromBaserowFields(enterprise));
-            
-            console.log('✅ Données mappées:', mappedData.length, 'entreprises');
-            
-            return {
-                success: true,
-                data: mappedData,
-                source: 'enterprises'
-            };
-        }
-        
-        // 2. Si pas de résultats, essayer la recherche par entités
-        console.log('⚠️ Pas de résultats enterprises, tentative entities...');
-        
-        try {
-            const entityResults = await this.searchEntities(query, options);
-            
-            if (entityResults.success && entityResults.data && Array.isArray(entityResults.data)) {
-                const mappedEntityData = entityResults.data.map(entity => this.mapFromBaserowFields(entity));
-                
-                return {
-                    success: true,
-                    data: mappedEntityData,
-                    source: 'entities'
-                };
-            }
-        } catch (entityError) {
-            console.error('❌ Erreur recherche entities:', entityError);
-        }
-        
-        // 3. Retourner le résultat original si tout échoue
-        return {
-            success: results.success || false,
-            data: [],
-            source: 'fallback',
-            error: results.error || 'Aucun résultat trouvé'
-        };
-    }
-
     // ✅ CORRECTION : Invalidation cache avec bon nom
     invalidateSearchCache(nom) {
         if (!nom) return;
@@ -379,16 +370,16 @@ class EnterpriseService {
         });
     }
 
-    // ✅ CORRECTION : Stats avec bon format
+    // ✅ CORRECTION : Stats avec endpoint unifié
     async getEnterpriseStats() {
         const requestData = {
             operation: "stats"
         };
 
-        return apiService.callWebhook('ENTERPRISE_API', requestData);
+        return apiService.callWebhook(ENDPOINTS.SEARCH, requestData);
     }
 
-    // ✅ CORRECTION : Export avec bon format
+    // ✅ CORRECTION : Export avec endpoint unifié
     async exportEnterprises(format = 'csv', filters = {}) {
         const requestData = {
             operation: "export",
@@ -396,7 +387,7 @@ class EnterpriseService {
             filters: filters
         };
 
-        return apiService.callWebhook('ENTERPRISE_API', requestData);
+        return apiService.callWebhook(ENDPOINTS.SEARCH, requestData);
     }
 }
 
