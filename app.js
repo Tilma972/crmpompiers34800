@@ -154,38 +154,129 @@ function handleEnterpriseSelection(enterprise) {
     }
 }
 
+// ✅ CORRECTION : Utilise GATEWAY_ENTITIES pour rechercher une qualification
+async function searchQualificationForEnterprise(enterpriseId) {
+    try {
+        console.log('🔍 Recherche qualification pour enterprise_id:', enterpriseId);
+        
+        const requestData = {
+            action: 'recherche_qualification',
+            data: {
+                enterprise_id: enterpriseId
+            }
+        };
+        
+        const response = await apiService.callWebhook('GATEWAY_ENTITIES', requestData);
+        
+        if (response.success && response.data && response.data.length > 0) {
+            return response.data[0]; // Retourne la première qualification
+        }
+        
+        return null; // Aucune qualification trouvée
+        
+    } catch (error) {
+        console.error('💥 Erreur searchQualificationForEnterprise:', error);
+        return null;
+    }
+}
+
 // ================================
 // 📄 GÉNÉRATION DE DOCUMENTS
 // ================================
 async function handleDocumentGeneration(enterprise, documentType) {
     try {
         // Vérifie si l'entreprise a des données suffisantes
-        if (!enterprise.nom && !enterprise.name) {
+        if (!enterprise.nom && !enterprise.name && !enterprise.nom_entreprise) {
             showMessage('❌ Données entreprise insuffisantes pour générer le document');
             return;
         }
 
-        // Prépare les données de qualification de base
-        const baseQualificationData = {
-            enterprise: enterprise,
-            action_type: documentType,
-            publications: window.qualificationData?.publications || [],
-            total_price: window.qualificationData?.total_price || 0,
-            created_at: new Date().toISOString()
-        };
+        updateStatus(`🔍 Recherche qualification pour ${enterprise.nom_entreprise || enterprise.nom}...`);
 
-        // Applique l'offre sélectionnée si disponible
-        let finalQualificationData = baseQualificationData;
-        if (window.selectedOffer) {
-            finalQualificationData = smartOffersManager.applyOfferToQualification(
-                window.selectedOffer, 
-                baseQualificationData
-            );
+        // ✅ CORRECTION : Rechercher une qualification existante d'abord
+        const qualification = await searchQualificationForEnterprise(enterprise.id);
+        
+        if (qualification) {
+            // ✅ Qualification trouvée → Dialog de validation
+            console.log('✅ Qualification trouvée:', qualification);
+            showQualificationValidationDialog(qualification, documentType);
+        } else {
+            // ❌ Pas de qualification → Demander création
+            console.log('⚠️ Aucune qualification trouvée');
+            showCreateQualificationFirst(enterprise, documentType);
         }
 
-        // Génère le document avec l'IA
+    } catch (error) {
+        console.error('Erreur génération document:', error);
+        showMessage('❌ Erreur lors de la génération du document');
+    }
+}
+
+// ================================
+// 🎯 DIALOGS DE QUALIFICATION
+// ================================
+function showQualificationValidationDialog(qualification, documentType) {
+    const contentDiv = document.getElementById(UI_ELEMENTS.STATE_CONTENT);
+    if (!contentDiv) return;
+
+    const documentLabel = getActionLabel(documentType);
+    
+    contentDiv.innerHTML = `
+        <div class="qualification-validation-dialog">
+            <h3>✅ Qualification existante trouvée</h3>
+            <p>Une qualification existe déjà pour cette entreprise. Souhaitez-vous :</p>
+            <div class="qualification-actions">
+                <button class="btn btn-primary" onclick="generateDocumentWithQualification('${documentType}')">
+                    📄 Générer ${documentLabel} avec cette qualification
+                </button>
+                <button class="btn btn-secondary" onclick="showQualificationInterface(selectedEnterprise)">
+                    ✏️ Modifier la qualification
+                </button>
+                <button class="btn btn-secondary" onclick="navigationManager.showMainMenu()">
+                    🏠 Retour au menu
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Sauvegarde la qualification pour usage ultérieur
+    window.qualificationData = qualification;
+}
+
+function showCreateQualificationFirst(enterprise, documentType) {
+    const contentDiv = document.getElementById(UI_ELEMENTS.STATE_CONTENT);
+    if (!contentDiv) return;
+
+    const documentLabel = getActionLabel(documentType);
+    
+    contentDiv.innerHTML = `
+        <div class="create-qualification-dialog">
+            <h3>⚠️ Qualification requise</h3>
+            <p>Aucune qualification n'existe pour <strong>${enterprise.nom_entreprise || enterprise.nom}</strong>.</p>
+            <p>Vous devez créer une qualification avant de générer un ${documentLabel.toLowerCase()}.</p>
+            <div class="qualification-actions">
+                <button class="btn btn-primary" onclick="showQualificationInterface(selectedEnterprise)">
+                    🎯 Créer une qualification
+                </button>
+                <button class="btn btn-secondary" onclick="navigationManager.showMainMenu()">
+                    🏠 Retour au menu
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+async function generateDocumentWithQualification(documentType) {
+    if (!window.qualificationData) {
+        showMessage('❌ Aucune qualification disponible');
+        return;
+    }
+
+    try {
+        updateStatus(`📄 Génération du ${getActionLabel(documentType)} en cours...`);
+        
         const result = await documentGenerationManager.generateIntelligentDocument(
-            finalQualificationData,
+            window.qualificationData,
             documentType,
             { enhanced: true, includeAnalysis: true }
         );
@@ -195,7 +286,6 @@ async function handleDocumentGeneration(enterprise, documentType) {
         } else {
             showMessage(`❌ Erreur lors de la génération: ${result.error}`);
         }
-
     } catch (error) {
         console.error('Erreur génération document:', error);
         showMessage('❌ Erreur lors de la génération du document');
@@ -508,6 +598,7 @@ window.selectEnterprise = selectEnterprise;
 window.callAgentOrchestrator = callAgentOrchestrator;
 window.sendDocumentByEmail = sendDocumentByEmail;
 window.generateFromQualification = generateFromQualification;
+window.generateDocumentWithQualification = generateDocumentWithQualification;
 
 // Exposition des gestionnaires pour les événements onclick
 window.navigationManager = navigationManager;
