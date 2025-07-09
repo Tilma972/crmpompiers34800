@@ -526,7 +526,7 @@ window.formatPercentage = formatPercentage;
 window.getTelegramUser = getTelegramUser;
 
 // 🧪 FONCTION DE TEST API TEMPORAIRE
-windtestApiCallow. = async function() {
+window.testApiCall = async function() {
     console.log('🧪 Test direct API...');
     
     const testData = {
