@@ -20,7 +20,7 @@ class EnterpriseService {
     // 🔍 FONCTIONS DE RECHERCHE
     // Endpoint: RECHERCHE_ENTREPRISE
     // ==========================================
-    
+
     // ✅ CORRECTION : Recherche avec endpoint unifié
     async searchEnterprises(query, options = {}) {
         if (!query || query.trim().length < 2) {
@@ -29,35 +29,49 @@ class EnterpriseService {
 
         const cacheKey = CacheUtils.generateSearchKey(query, 'enterprises');
         const cachedResult = this.cache.get(cacheKey);
-        
+
         if (cachedResult && !options.forceRefresh) {
             return { success: true, data: cachedResult };
         }
 
-        // ✅ CORRECTION : Format compatible avec workflow n8n
         const searchData = {
             operation: "getMany",
             search: query.trim(),
             limit: options.limit || 10
         };
 
-        // 🔍 AJOUT DE LOGS DE DIAGNOSTIC
         console.log('🔍 [enterpriseService] Endpoint appelé:', ENDPOINTS.SEARCH);
         console.log('🔍 [enterpriseService] Data envoyée:', JSON.stringify(searchData));
-        
+
         const response = await apiService.callWebhook(ENDPOINTS.SEARCH, searchData);
-        
-        console.log('🔍 [enterpriseService] Réponse reçue:', response);
-        
-        // ✅ CORRIGÉ : Validation du payload avant mise en cache
-        if (response.success && response.data && Array.isArray(response.data)) {
-            this.cache.set(cacheKey, response.data);
-            console.log('✅ Cache mis à jour:', response.data.length, 'entreprises');
+
+        console.log('🔍 [enterpriseService] Réponse brute:', response);
+
+        // ✅ CORRECTION : Gérer le format du workflow
+        if (response.success && response.data && response.data.data && Array.isArray(response.data.data)) {
+            this.cache.set(cacheKey, response.data.data);
+            console.log('✅ Cache mis à jour:', response.data.data.length, 'entreprises');
+
+            return {
+                success: true,
+                data: response.data.data,  // ✅ Extraire data.data
+                count: response.data.count,
+                operation: response.data.operation
+            };
         } else if (response.success) {
-            console.warn('⚠️ Réponse success mais data invalide:', response.data);
+            console.warn('⚠️ Réponse success mais structure invalide:', response.data);
+            return {
+                success: false,
+                error: 'Format de réponse invalide',
+                data: []
+            };
         }
 
-        return response;
+        return {
+            success: false,
+            error: response.error || 'Erreur de recherche',
+            data: []
+        };
     }
 
     // ✅ CORRECTION : Recherche par ID avec endpoint unifié
@@ -68,7 +82,7 @@ class EnterpriseService {
 
         const cacheKey = CacheUtils.generateEnterpriseKey(id);
         const cachedResult = this.cache.get(cacheKey);
-        
+
         if (cachedResult) {
             return { success: true, data: cachedResult };
         }
@@ -80,7 +94,7 @@ class EnterpriseService {
         };
 
         const response = await apiService.callWebhook(ENDPOINTS.SEARCH, searchData);
-        
+
         if (response.success) {
             this.cache.set(cacheKey, response.data);
         }
@@ -91,22 +105,22 @@ class EnterpriseService {
     // ✅ CORRECTION : Version simplifiée et cohérente
     async smartSearch(query, options = {}) {
         console.log('🧠 SmartSearch appelée avec:', query, options);
-        
+
         // Recherche unique via RECHERCHE_ENTREPRISE
         const results = await this.searchEnterprises(query, options);
-        
+
         if (results.success && results.data && Array.isArray(results.data)) {
-            const mappedData = results.data.map(enterprise => 
+            const mappedData = results.data.map(enterprise =>
                 this.mapFromBaserowFields(enterprise)
             );
-            
+
             return {
                 success: true,
                 data: mappedData,
                 source: 'enterprises'
             };
         }
-        
+
         return {
             success: false,
             data: [],
@@ -119,7 +133,7 @@ class EnterpriseService {
     // 🏗️ FONCTIONS D'ACTIONS CRUD
     // Endpoint: GATEWAY_ENTITIES
     // ==========================================
-    
+
     // ✅ CORRIGÉ : Utiliser GATEWAY_ENTITIES
     async createEnterprise(enterpriseData) {
         const validation = this.validateEnterpriseData(enterpriseData);
@@ -140,7 +154,7 @@ class EnterpriseService {
         };
 
         const response = await apiService.callWebhook(ENDPOINTS.ACTIONS, requestData);
-        
+
         // Invalide le cache des recherches
         if (response.success) {
             this.invalidateSearchCache(enterpriseData.nom_entreprise || enterpriseData.nom);
@@ -169,7 +183,7 @@ class EnterpriseService {
         };
 
         const response = await apiService.callWebhook(ENDPOINTS.ACTIONS, requestData);
-        
+
         // Invalide le cache
         if (response.success) {
             this.cache.delete(CacheUtils.generateEnterpriseKey(id));
@@ -193,7 +207,7 @@ class EnterpriseService {
         };
 
         const response = await apiService.callWebhook(ENDPOINTS.ACTIONS, requestData);
-        
+
         // Invalide le cache
         if (response.success) {
             this.cache.delete(CacheUtils.generateEnterpriseKey(id));
@@ -206,31 +220,31 @@ class EnterpriseService {
     // 🔄 FONCTIONS DE MAPPING
     // Compatibilité Baserow
     // ==========================================
-    
+
     // ✅ NOUVEAU : Mapping vers champs Baserow réels
     mapToBaserowFields(inputData) {
         const baserowData = {};
-        
+
         // Nom de l'entreprise
         if (inputData.nom) baserowData.nom_entreprise = inputData.nom;
         if (inputData.nom_entreprise) baserowData.nom_entreprise = inputData.nom_entreprise;
-        
+
         // Adresse et localisation
         if (inputData.adresse) baserowData.Adresse = inputData.adresse;
         if (inputData.commune) baserowData.Commune = this.getCommuneId(inputData.commune);
         if (inputData.ville) baserowData.Commune = this.getCommuneId(inputData.ville);
-        
+
         // Contact
         if (inputData.telephone) baserowData.Telephone = inputData.telephone;
         if (inputData.portable) baserowData.portable = inputData.portable;
         if (inputData.email) baserowData.email = inputData.email;
         if (inputData.interlocuteur) baserowData.interlocuteur = inputData.interlocuteur;
         if (inputData.contact) baserowData.interlocuteur = inputData.contact;
-        
+
         // Activité
         if (inputData.activite) baserowData.Activitée = inputData.activite;
         if (inputData.secteur_activite) baserowData.Activitée = inputData.secteur_activite;
-        
+
         return baserowData;
     }
 
@@ -244,33 +258,33 @@ class EnterpriseService {
             id: baserowData.id,
             nom: baserowData.nom_entreprise || 'Nom non spécifié',
             nom_entreprise: baserowData.nom_entreprise || 'Nom non spécifié',
-            
+
             // ✅ CORRIGÉ : Adresse directe du payload
             adresse: baserowData.adresse || '',
-            
+
             // ✅ CORRIGÉ : Commune directe du payload (pas de conversion nécessaire)
             commune: baserowData.commune || '',
             ville: baserowData.commune || '', // Alias pour compatibilité
-            
+
             // ✅ CORRIGÉ : Téléphone direct du payload
             telephone: baserowData.telephone || '',
             portable: baserowData.portable || '',
             email: baserowData.email || '',
             interlocuteur: baserowData.interlocuteur || '',
-            
+
             // ✅ CORRIGÉ : Activité directe du payload (même si vide)
             activite: baserowData.activite || '',
             secteur_activite: baserowData.activite || '', // Alias
-            
+
             // ✅ CORRIGÉ : Statut direct du payload
             statut: baserowData.statut || 'actif',
-            
+
             // Champs workflow directs du payload
             format_encart_2025: baserowData.format_encart_2025 || '',
             mois_parution_2025: baserowData.mois_parution_2025 || '',
             client_2025: baserowData.client_2025 || '',
             prospecteur_2024: baserowData.prospecteur_2024 || '',
-            
+
             // Champs calculés/virtuels
             code_postal: '', // Pas disponible dans le payload
             date_creation: baserowData.created_at || null,
@@ -297,7 +311,7 @@ class EnterpriseService {
             'LE BOSC': 2984042,
             'VENDEMIAN': 2984044
         };
-        
+
         return mapping[communeLabel?.toUpperCase()] || null;
     }
 
@@ -319,7 +333,7 @@ class EnterpriseService {
             2984042: 'LE BOSC',
             2984044: 'VENDEMIAN'
         };
-        
+
         return mapping[communeId] || '';
     }
 
@@ -330,7 +344,7 @@ class EnterpriseService {
     // ✅ CORRECTION : Validation avec champs Baserow
     validateEnterpriseData(data, required = true) {
         const errors = [];
-        
+
         if (required) {
             const nom = data.nom_entreprise || data.nom;
             if (!nom || !validateEnterpriseName(nom)) {
@@ -370,7 +384,7 @@ class EnterpriseService {
     // ✅ CORRECTION : Invalidation cache avec bon nom
     invalidateSearchCache(nom) {
         if (!nom) return;
-        
+
         // Invalide les recherches similaires
         const searchTerms = [
             nom.toLowerCase(),
@@ -423,12 +437,12 @@ export const EnterpriseUtils = {
             if (filters.commune && !enterprise.commune?.toLowerCase().includes(filters.commune.toLowerCase())) {
                 return false;
             }
-            
+
             // Utilise le champ mappé 'activite' au lieu de 'secteur_activite'
             if (filters.activite && !enterprise.activite?.toLowerCase().includes(filters.activite.toLowerCase())) {
                 return false;
             }
-            
+
             return true;
         });
     },
