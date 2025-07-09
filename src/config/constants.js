@@ -1,12 +1,8 @@
 // Configuration des webhooks n8n
 export const N8N_WEBHOOKS = {
     AGENT_CRM: 'https://n8n.dsolution-ia.fr/webhook/crm_agent',
-    ENTERPRISE_API: 'https://n8n.dsolution-ia.fr/webhook/recherche_entreprise',
-    GATEWAY_ENTITIES: 'https://n8n.dsolution-ia.fr/webhook/gateway_entities',
-    PDF_GENERATOR: 'https://n8n.dsolution-ia.fr/webhook/pdf_generator',
-    EMAIL_WORKFLOW: 'https://n8n.dsolution-ia.fr/webhook/email_workflow',
-    FORM_ENTREPRISE: 'https://n8n.dsolution-ia.fr/webhook/form_entreprise',
-    QUALIFICATION_API: 'https://n8n.dsolution-ia.fr/webhook/recherche_qualification'
+    RECHERCHE_ENTREPRISE: 'https://n8n.dsolution-ia.fr/webhook/recherche_entreprise',
+    GATEWAY_ENTITIES: 'https://n8n.dsolution-ia.fr/webhook/gateway_entities'     
 };
 
 // Configuration des éléments UI
