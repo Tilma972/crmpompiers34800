@@ -13,7 +13,10 @@ const N8N_WEBHOOKS = {
     EMAIL_WORKFLOW: 'https://n8n.dsolution-ia.fr/webhook/email_workflow',
     
     // Formulaire Entreprise - Workflows envoi de formulaire auto
-    FORM_ENTREPRISE: 'https://n8n.dsolution-ia.fr/webhook/form_entreprise'
+    FORM_ENTREPRISE: 'https://n8n.dsolution-ia.fr/webhook/form_entreprise',
+    
+    // Gateway Entities - Recherche centralisée d'entités
+    GATEWAY_ENTITIES: 'https://n8n.dsolution-ia.fr/webhook/gateway_entities'
 };
 
 // Exporter la configuration

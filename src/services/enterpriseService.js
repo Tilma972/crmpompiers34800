@@ -28,7 +28,13 @@ class EnterpriseService {
             limit: options.limit || 10
         };
 
+        // 🔍 AJOUT DE LOGS DE DIAGNOSTIC
+        console.log('🔍 [enterpriseService] URL appelée:', 'ENTERPRISE_API');
+        console.log('🔍 [enterpriseService] Data envoyée:', JSON.stringify(searchData));
+        
         const response = await apiService.callWebhook('ENTERPRISE_API', searchData);
+        
+        console.log('🔍 [enterpriseService] Réponse reçue:', response);
         
         if (response.success) {
             this.cache.set(cacheKey, response.data);
@@ -246,12 +252,14 @@ class EnterpriseService {
             return { success: false, error: 'Requête trop courte' };
         }
 
+        // 🔧 CORRECTION : Format unifié pour toutes les recherches
         const searchData = {
-            operation: "search",
-            query: query.trim(),
-            type: options.type || 'all',
+            operation: 'getMany',
+            search: query.trim(),
             limit: options.limit || 10
         };
+        
+        console.log('🔍 [searchEntities] Data envoyée:', JSON.stringify(searchData));
 
         return apiService.callWebhook('GATEWAY_ENTITIES', searchData);
     }

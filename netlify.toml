@@ -1,0 +1,10 @@
+[build]
+  publish = "."
+  
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[build.environment]
+  SITE_URL = "https://crmpompiers34800.netlify.app"

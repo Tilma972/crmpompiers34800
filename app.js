@@ -525,6 +525,33 @@ window.formatPercentage = formatPercentage;
 // Exposition des fonctions Telegram
 window.getTelegramUser = getTelegramUser;
 
+// 🧪 FONCTION DE TEST API TEMPORAIRE
+window.testApiCall = async function() {
+    console.log('🧪 Test direct API...');
+    
+    const testData = {
+        operation: "getMany",
+        search: "test",
+        limit: 5
+    };
+    
+    try {
+        const response = await fetch('https://n8n.dsolution-ia.fr/webhook/recherche_entreprise', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(testData)
+        });
+        
+        console.log('🧪 Response status:', response.status);
+        console.log('🧪 Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        const data = await response.json();
+        console.log('🧪 Response data:', data);
+    } catch (error) {
+        console.error('🧪 Error:', error);
+    }
+};
+
 // ================================
 // 🚀 DÉMARRAGE DE L'APPLICATION
 // ================================
