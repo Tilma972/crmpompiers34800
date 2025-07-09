@@ -21,7 +21,7 @@ class ApiService {
         };
 
         let lastError;
-        
+
         for (let attempt = 0; attempt < this.maxRetries; attempt++) {
             try {
                 const controller = new AbortController();
@@ -43,15 +43,15 @@ class ApiService {
 
             } catch (error) {
                 lastError = error;
-                
+
                 if (attempt < this.maxRetries - 1) {
                     await this.delay(this.retryDelay * Math.pow(2, attempt));
                 }
             }
         }
 
-        return { 
-            success: false, 
+        return {
+            success: false,
             error: lastError.message || 'Erreur de connexion',
             details: lastError
         };
@@ -93,7 +93,7 @@ class ApiService {
     // Appel spécifique aux webhooks n8n
     async callWebhook(webhookKey, data = {}, options = {}) {
         const webhookUrl = N8N_WEBHOOKS[webhookKey];
-        
+
         if (!webhookUrl) {
             return {
                 success: false,
@@ -101,23 +101,18 @@ class ApiService {
             };
         }
 
-        const requestData = {
-            ...data,
-            timestamp: new Date().toISOString(),
-            source: 'telegram-webapp'
-        };
-
-        return this.post(webhookUrl, requestData, options.headers);
+        // ✅ CORRECTION : Envoie les données telles quelles
+        return this.post(webhookUrl, data, options.headers);
     }
 
     // Appel avec authentification Telegram
     async callWithTelegramAuth(webhookKey, data = {}, telegramData = {}) {
         const authHeaders = {};
-        
+
         if (telegramData.user) {
             authHeaders['X-Telegram-User'] = JSON.stringify(telegramData.user);
         }
-        
+
         if (telegramData.chat_id) {
             authHeaders['X-Telegram-Chat'] = telegramData.chat_id;
         }
@@ -142,7 +137,7 @@ class ApiService {
     // Validation des données avant envoi
     validateRequestData(data, requiredFields = []) {
         const errors = [];
-        
+
         requiredFields.forEach(field => {
             if (!data[field]) {
                 errors.push(`Le champ ${field} est requis`);
@@ -176,13 +171,13 @@ export const ApiUtils = {
     // Nettoie les données avant envoi
     sanitizeData(data) {
         const sanitized = {};
-        
+
         Object.entries(data).forEach(([key, value]) => {
             if (value !== null && value !== undefined && value !== '') {
                 sanitized[key] = value;
             }
         });
-        
+
         return sanitized;
     },
 
