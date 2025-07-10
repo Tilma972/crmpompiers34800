@@ -48,6 +48,10 @@ window.qualificationData = null;
 // Variables pour les résultats de recherche (maintenues globalement)
 let currentSearchResults = [];
 
+// Variables globales pour les parutions
+let publicationCounter = 0;
+let publicationsData = [];
+
 // ================================
 // 🔄 FONCTION PRINCIPALE D'INITIALISATION
 // ================================
@@ -293,22 +297,118 @@ async function generateDocumentWithQualification(documentType) {
 }
 
 // ================================
-// 🎯 INTERFACE DE QUALIFICATION
+// 🎯 INTERFACE DE QUALIFICATION AVEC PARUTIONS MULTIPLES
 // ================================
 function showQualificationInterface(enterprise) {
     const contentDiv = document.getElementById(UI_ELEMENTS.STATE_CONTENT);
     if (!contentDiv) return;
 
-    // Crée le formulaire de qualification
-    contentDiv.innerHTML = formManager.createQualificationForm(enterprise, currentAction);
+    currentState = 'qualification';
     
-    // Initialise le formulaire avec callback
-    formManager.initializeForm('qualificationForm', async (formData) => {
-        await handleQualificationSubmission(formData);
-    });
+    // Générer le contenu de qualification avec parutions multiples
+    contentDiv.innerHTML = getQualificationContent();
+    
+    // Initialiser les parutions
+    initializePublications();
+    
+    // Auto-remplissage si données disponibles
+    if (enterprise) {
+        setTimeout(() => {
+            autoFillQualificationForm(enterprise);
+        }, 200);
+    }
+    
+    // Configurer la validation en temps réel
+    setupFieldValidation();
+}
 
-    // Génère et affiche les offres intelligentes
-    showSmartOffersForEnterprise(enterprise);
+function getQualificationContent() {
+    return `
+        <div class="form-group">
+            <label class="form-label">Entreprise concernée :</label>
+            <input type="text" class="form-input" id="enterpriseInput" 
+                   value="${selectedEnterprise ? (selectedEnterprise.nom_entreprise || selectedEnterprise.nom) : ''}"
+                   placeholder="Tapez le nom de l'entreprise..."
+                   oninput="handleEnterpriseSearch(this.value)">
+        </div>
+        <div id="enterpriseResults" class="search-results"></div>
+        
+        <!-- AUTO-REMPLISSAGE -->
+        <div id="autoFillStatus" class="auto-fill-status" style="display: none;">
+            <div style="background: #d1ecf1; padding: 8px; border-radius: 6px; margin: 10px 0; font-size: 12px;">
+                🤖 <strong>Auto-remplissage activé</strong> - Les champs sont pré-remplis avec les données existantes
+            </div>
+        </div>
+        
+        <!-- SECTION PARUTIONS MULTIPLES -->
+        <div class="form-group">
+            <label class="form-label">
+                📅 Parutions calendrier 2026
+                <span style="font-size: 11px; color: #666; font-weight: normal;">
+                    (Ajoutez une ou plusieurs parutions)
+                </span>
+            </label>
+            <div id="publicationsList" class="publications-list">
+                <!-- Publications ajoutées dynamiquement -->
+            </div>
+            <button type="button" class="btn btn-outline" onclick="addPublication()" id="addPublicationBtn">
+                ➕ Ajouter une parution
+            </button>
+            <div class="price-display" id="priceDisplay">
+                <strong>Prix total : 0€</strong>
+                <div id="priceBreakdown" style="font-size: 12px; margin-top: 5px;"></div>
+            </div>
+        </div>
+        
+        <!-- OFFRES SPÉCIALES -->
+        <div class="form-group" id="specialOffersSection" style="display: none;">
+            <label class="form-label">🎁 Offres spéciales disponibles</label>
+            <div id="availableOffers" class="offer-options">
+                <!-- Offres générées automatiquement -->
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Mode de paiement :</label>
+            <select class="form-select" id="modePaiement">
+                <option value="Virement">Virement bancaire</option>
+                <option value="Cheque">Chèque</option>
+                <option value="Carte">Carte bancaire</option>
+                <option value="Especes">Espèces</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Contact :</label>
+            <input type="text" class="form-input" id="interlocuteur" 
+                   placeholder="Nom du contact">
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Email contact :</label>
+            <input type="email" class="form-input" id="emailContact" 
+                   placeholder="email@exemple.com">
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Téléphone :</label>
+            <input type="tel" class="form-input" id="telephoneContact" 
+                   placeholder="06 12 34 56 78">
+        </div>
+        
+        <div class="form-group">
+            <label class="form-label">Commentaires :</label>
+            <textarea class="form-input" id="commentaires" rows="3" 
+                      placeholder="Informations supplémentaires..."></textarea>
+        </div>
+        
+        <div class="form-buttons">
+            <button class="btn btn-secondary" onclick="showMainMenu()">Annuler</button>
+            <button class="btn btn-primary" onclick="createQualification()" disabled id="executeBtn">
+                Créer Qualification
+            </button>
+        </div>
+    `;
 }
 
 // ================================
@@ -587,6 +687,639 @@ async function generateFromQualification(documentType) {
 }
 
 // ================================
+// 📅 GESTION PARUTIONS MULTIPLES
+// ================================
+
+function addPublication() {
+    publicationCounter++;
+    const publicationsList = document.getElementById('publicationsList');
+    
+    const publicationDiv = document.createElement('div');
+    publicationDiv.className = 'publication-item';
+    publicationDiv.id = `publication-${publicationCounter}`;
+    
+    publicationDiv.innerHTML = `
+        <div class="publication-header">
+            <span class="publication-title">📅 Parution ${publicationCounter}</span>
+            <button type="button" class="btn-remove" onclick="removePublication(${publicationCounter})">
+                🗑️ Supprimer
+            </button>
+        </div>
+        <div class="publication-fields">
+            <div class="form-field">
+                <label>Mois :</label>
+                <select class="form-select publication-mois" id="mois-${publicationCounter}" onchange="updatePublicationPrice(${publicationCounter})">
+                    <option value="">Sélectionner...</option>
+                    <option value="Janvier">Janvier 2026</option>
+                    <option value="Février">Février 2026</option>
+                    <option value="Mars">Mars 2026</option>
+                    <option value="Avril">Avril 2026</option>
+                    <option value="Mai">Mai 2026</option>
+                    <option value="Juin">Juin 2026</option>
+                    <option value="Juillet">Juillet 2026</option>
+                    <option value="Août">Août 2026</option>
+                    <option value="Septembre">Septembre 2026</option>
+                    <option value="Octobre">Octobre 2026</option>
+                    <option value="Novembre">Novembre 2026</option>
+                    <option value="Décembre">Décembre 2026</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>Format :</label>
+                <select class="form-select publication-format" id="format-${publicationCounter}" onchange="updatePublicationPrice(${publicationCounter})">
+                    <option value="">Sélectionner...</option>
+                    <option value="6X4" data-price="350">6X4 - 350€</option>
+                    <option value="6X8" data-price="500">6X8 - 500€</option>
+                    <option value="12X4" data-price="500">12X4 - 500€</option>
+                    <option value="SPECIAL" data-price="0">Format spécial (prix à définir)</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label>Prix :</label>
+                <input type="number" class="form-input publication-prix" id="prix-${publicationCounter}" 
+                       min="0" step="10" placeholder="0" onchange="updatePublicationPrice(${publicationCounter})">
+            </div>
+            <div class="form-field">
+                <label>Type :</label>
+                <select class="form-select publication-type" id="type-${publicationCounter}" onchange="updatePublicationPrice(${publicationCounter})">
+                    <option value="payant">💰 Payant</option>
+                    <option value="offert">🎁 Offert</option>
+                </select>
+            </div>
+        </div>
+        <div class="publication-summary" id="summary-${publicationCounter}">
+            Complétez les champs ci-dessus
+        </div>
+    `;
+    
+    publicationsList.appendChild(publicationDiv);
+    updateTotalPrice();
+    checkSpecialOffers();
+    
+    // Auto-focus sur le premier champ
+    document.getElementById(`mois-${publicationCounter}`).focus();
+}
+
+function removePublication(id) {
+    const publicationDiv = document.getElementById(`publication-${id}`);
+    if (publicationDiv) {
+        publicationDiv.remove();
+        updateTotalPrice();
+        checkSpecialOffers();
+        
+        // Renommer les parutions restantes
+        renumberPublications();
+    }
+}
+
+function renumberPublications() {
+    const publications = document.querySelectorAll('.publication-item');
+    publications.forEach((pub, index) => {
+        const title = pub.querySelector('.publication-title');
+        if (title) {
+            title.textContent = `📅 Parution ${index + 1}`;
+        }
+    });
+}
+
+function updatePublicationPrice(id) {
+    const moisSelect = document.getElementById(`mois-${id}`);
+    const formatSelect = document.getElementById(`format-${id}`);
+    const prixInput = document.getElementById(`prix-${id}`);
+    const typeSelect = document.getElementById(`type-${id}`);
+    const summaryDiv = document.getElementById(`summary-${id}`);
+    
+    if (!moisSelect || !formatSelect || !prixInput || !typeSelect) return;
+    
+    const mois = moisSelect.value;
+    const format = formatSelect.value;
+    const type = typeSelect.value;
+    
+    // Auto-calcul du prix selon le format
+    if (format && format !== 'SPECIAL') {
+        const selectedOption = formatSelect.querySelector(`option[value="${format}"]`);
+        const basePrice = parseInt(selectedOption.dataset.price || 0);
+        
+        if (type === 'payant') {
+            prixInput.value = basePrice;
+        } else {
+            prixInput.value = 0;
+        }
+    }
+    
+    // Mise à jour du résumé
+    updatePublicationSummary(id);
+    updateTotalPrice();
+    checkSpecialOffers();
+}
+
+function updatePublicationSummary(id) {
+    const mois = document.getElementById(`mois-${id}`)?.value || '';
+    const format = document.getElementById(`format-${id}`)?.value || '';
+    const prix = parseInt(document.getElementById(`prix-${id}`)?.value || 0);
+    const type = document.getElementById(`type-${id}`)?.value || 'payant';
+    const summaryDiv = document.getElementById(`summary-${id}`);
+    
+    if (!summaryDiv) return;
+    
+    if (mois && format) {
+        const typeIcon = type === 'offert' ? '🎁' : '💰';
+        const priceText = type === 'offert' ? 'Offert' : `${prix}€`;
+        
+        summaryDiv.innerHTML = `
+            <div class="publication-summary-content ${type}">
+                ${typeIcon} <strong>${mois} ${format}</strong> - ${priceText}
+            </div>
+        `;
+        summaryDiv.className = `publication-summary ${type}`;
+    } else {
+        summaryDiv.innerHTML = 'Complétez les champs ci-dessus';
+        summaryDiv.className = 'publication-summary';
+    }
+}
+
+// ================================
+// 💰 CALCULS DE PRIX
+// ================================
+
+function collectPublicationsData() {
+    const publications = [];
+    const publicationItems = document.querySelectorAll('.publication-item');
+    
+    publicationItems.forEach(item => {
+        const id = item.id.split('-')[1];
+        const mois = document.getElementById(`mois-${id}`)?.value;
+        const format = document.getElementById(`format-${id}`)?.value;
+        const prix = parseInt(document.getElementById(`prix-${id}`)?.value || 0);
+        const type = document.getElementById(`type-${id}`)?.value;
+        
+        if (mois && format) {
+            publications.push({
+                mois: mois,
+                format: format,
+                prix: prix,
+                type: type,
+                ordre: publications.length + 1
+            });
+        }
+    });
+    
+    return publications;
+}
+
+function calculateTotalPrice(publications) {
+    const payantes = publications.filter(p => p.type === 'payant');
+    const offertes = publications.filter(p => p.type === 'offert');
+    
+    const montantPayant = payantes.reduce((total, pub) => total + pub.prix, 0);
+    const montantOffert = offertes.reduce((total, pub) => total + pub.prix, 0);
+    
+    return {
+        total: montantPayant,
+        payant: montantPayant,
+        offert: montantOffert,
+        publications_payantes: payantes.length,
+        publications_offertes: offertes.length
+    };
+}
+
+function updateTotalPrice() {
+    const publications = collectPublicationsData();
+    const pricing = calculateTotalPrice(publications);
+    
+    const priceDisplay = document.getElementById('priceDisplay');
+    const breakdownDiv = document.getElementById('priceBreakdown');
+    
+    if (!priceDisplay || !breakdownDiv) return;
+    
+    // Affichage principal
+    priceDisplay.innerHTML = `<strong>Prix total : ${pricing.total}€</strong>`;
+    
+    // Détail
+    let breakdown = [];
+    if (pricing.publications_payantes > 0) {
+        breakdown.push(`${pricing.publications_payantes} parution(s) payante(s) : ${pricing.payant}€`);
+    }
+    if (pricing.publications_offertes > 0) {
+        breakdown.push(`${pricing.publications_offertes} parution(s) offerte(s) : 🎁 Incluses`);
+    }
+    
+    breakdownDiv.innerHTML = breakdown.join(' • ');
+    
+    // Activation/désactivation du bouton
+    const executeBtn = document.getElementById('executeBtn');
+    if (executeBtn) {
+        executeBtn.disabled = publications.length === 0 || !selectedEnterprise;
+    }
+}
+
+// ================================
+// 🎁 SYSTÈME D'OFFRES SPÉCIALES
+// ================================
+
+function checkSpecialOffers() {
+    const publications = collectPublicationsData();
+    const specialOffersSection = document.getElementById('specialOffersSection');
+    const availableOffers = document.getElementById('availableOffers');
+    
+    if (!publications.length || !specialOffersSection || !availableOffers) {
+        if (specialOffersSection) specialOffersSection.style.display = 'none';
+        return;
+    }
+    
+    const offers = generateSpecialOffers(publications);
+    
+    if (offers.length > 0) {
+        specialOffersSection.style.display = 'block';
+        availableOffers.innerHTML = offers.map(offer => createOfferHTML(offer)).join('');
+    } else {
+        specialOffersSection.style.display = 'none';
+    }
+}
+
+function generateSpecialOffers(publications) {
+    const offers = [];
+    const payantes = publications.filter(p => p.type === 'payant');
+    
+    // Offre 3+1 gratuit
+    if (payantes.length >= 3) {
+        offers.push({
+            type: '3plus1',
+            title: '🎁 Offre 3+1 : 4ème parution offerte',
+            description: 'Ajoutez une 4ème parution gratuite !',
+            action: 'offerFreeFourthPublication',
+            savings: 350
+        });
+    }
+    
+    // Offre fidélité (si client existant)
+    if (selectedEnterprise && (selectedEnterprise.Client_2025 === 'Oui' || selectedEnterprise.client_2025 === 'Oui')) {
+        offers.push({
+            type: 'fidelite',
+            title: '💎 Réduction fidélité -10%',
+            description: 'Client fidèle : -10% sur le total',
+            action: 'applyLoyaltyDiscount',
+            savings: Math.round(calculateTotalPrice(publications).total * 0.1)
+        });
+    }
+    
+    return offers;
+}
+
+function createOfferHTML(offer) {
+    return `
+        <div class="special-offer" onclick="${offer.action}()">
+            <div class="offer-header">
+                <strong>${offer.title}</strong>
+                <span class="offer-savings">Économie: ${offer.savings}€</span>
+            </div>
+            <div class="offer-description">${offer.description}</div>
+        </div>
+    `;
+}
+
+function offerFreeFourthPublication() {
+    if (confirm('Ajouter une 4ème parution gratuite ?')) {
+        addPublication();
+        const newId = publicationCounter;
+        
+        // Pré-remplir comme offerte
+        setTimeout(() => {
+            document.getElementById(`type-${newId}`).value = 'offert';
+            document.getElementById(`format-${newId}`).value = '6X4';
+            document.getElementById(`prix-${newId}`).value = 0;
+            updatePublicationPrice(newId);
+        }, 100);
+    }
+}
+
+function applyLoyaltyDiscount() {
+    if (confirm('Appliquer la réduction fidélité de 10% ?')) {
+        const publications = collectPublicationsData();
+        publications.forEach((pub, index) => {
+            if (pub.type === 'payant') {
+                const publicationItems = document.querySelectorAll('.publication-item');
+                const id = publicationItems[index].id.split('-')[1];
+                const prixInput = document.getElementById(`prix-${id}`);
+                const newPrice = Math.round(pub.prix * 0.9);
+                prixInput.value = newPrice;
+                updatePublicationPrice(id);
+            }
+        });
+        
+        showMessage('✅ Réduction fidélité appliquée !');
+    }
+}
+
+// ================================
+// 💾 CRÉATION QUALIFICATION COMPLÈTE
+// ================================
+
+async function createQualification() {
+    if (!selectedEnterprise) {
+        showMessage('Veuillez sélectionner une entreprise');
+        return;
+    }
+
+    const publications = collectPublicationsData();
+    
+    if (publications.length === 0) {
+        showMessage('Veuillez ajouter au moins une parution');
+        return;
+    }
+
+    // Validation des champs obligatoires
+    const hasIncompletePublication = publications.some(pub => !pub.mois || !pub.format);
+    if (hasIncompletePublication) {
+        showMessage('Veuillez compléter toutes les parutions');
+        return;
+    }
+
+    const modePaiement = document.getElementById('modePaiement').value;
+    const interlocuteur = document.getElementById('interlocuteur').value;
+    const emailContact = document.getElementById('emailContact').value;
+    const telephoneContact = document.getElementById('telephoneContact').value;
+    const commentaires = document.getElementById('commentaires').value;
+    
+    const pricing = calculateTotalPrice(publications);
+
+    updateStatus('🎯 Création qualification...');
+
+    try {
+        const qualificationData = {
+            action: 'qualification',
+            data: {
+                enterprise_id: selectedEnterprise.id,
+                enterprise_name: selectedEnterprise.nom_entreprise || selectedEnterprise.nom,
+                enterprise_adresse: selectedEnterprise.adresse,
+                enterprise_commune: selectedEnterprise.commune,
+                enterprise_telephone: selectedEnterprise.telephone,
+                
+                // Publications détaillées
+                publications: publications,
+                mode_paiement: modePaiement,
+                interlocuteur: interlocuteur || null,
+                email_contact: emailContact || null,
+                telephone_contact: telephoneContact || null,
+                commentaires: commentaires || null,
+                
+                // Métriques
+                nombre_parutions: publications.length,
+                prix_total: pricing.total,
+                montant_payant: pricing.payant,
+                montant_offert: pricing.offert,
+                has_multiple_publications: publications.length > 1,
+                has_free_publications: pricing.publications_offertes > 0,
+                
+                // Métadonnées
+                offre_type: pricing.publications_offertes > 0 ? 'avec_gratuites' : 'standard',
+                user_id: getTelegramUser().id,
+                timestamp: new Date().toISOString()
+            }
+        };
+
+        console.log('📤 Payload qualification:', qualificationData);
+
+        const response = await apiService.callWebhook('GATEWAY_ENTITIES', qualificationData);
+        
+        if (response.success) {
+            // Sauvegarde globalement pour usage ultérieur
+            window.qualificationData = response.data;
+            
+            // Affichage succès avec détails
+            const summary = generateQualificationSummary(publications, pricing);
+            showMessage(`✅ Qualification créée !\n\n${summary}`);
+            
+            updateStatus('✅ Qualification créée');
+            setTimeout(showMainMenu, 2000);
+        } else {
+            throw new Error(response.error || 'Erreur création qualification');
+        }
+        
+    } catch (error) {
+        console.error('❌ Erreur création qualification:', error);
+        showMessage(`❌ Erreur: ${error.message}`);
+        updateStatus('❌ Erreur création qualification');
+    }
+}
+
+function generateQualificationSummary(publications, pricing) {
+    const payantes = publications.filter(p => p.type === 'payant');
+    const offertes = publications.filter(p => p.type === 'offert');
+    
+    let summary = `📊 RÉSUMÉ :\n`;
+    summary += `• ${publications.length} parution(s) au total\n`;
+    
+    if (payantes.length > 0) {
+        summary += `• ${payantes.length} payante(s) : ${pricing.payant}€\n`;
+        summary += `  ${payantes.map(p => `${p.mois} ${p.format}`).join(', ')}\n`;
+    }
+    
+    if (offertes.length > 0) {
+        summary += `• ${offertes.length} offerte(s) 🎁\n`;
+        summary += `  ${offertes.map(p => `${p.mois} ${p.format}`).join(', ')}\n`;
+    }
+    
+    return summary;
+}
+
+// ================================
+// 🤖 UTILITAIRES AUTO-REMPLISSAGE
+// ================================
+
+function autoFillQualificationForm(enterprise) {
+    console.log('📝 Auto-remplissage qualification avancé...');
+    
+    // Afficher l'indicateur d'auto-remplissage
+    showAutoFillStatus('Formulaire pré-rempli avec les données existantes');
+    
+    // 🔒 CHAMPS CONTACT (lecture seule si données existantes)
+    fillContactFields(enterprise);
+    
+    // 🎯 PRÉ-SÉLECTION INTELLIGENTE des formats
+    fillFormatPreferences(enterprise);
+    
+    // 💰 PRÉ-REMPLISSAGE MODE DE PAIEMENT
+    fillPaymentPreferences(enterprise);
+    
+    // 📝 COMMENTAIRE AUTOMATIQUE
+    fillAutoComments(enterprise);
+    
+    console.log('✅ Auto-remplissage qualification terminé');
+}
+
+function fillContactFields(enterprise) {
+    const fields = [
+        { id: 'interlocuteur', value: enterprise.interlocuteur, label: 'Contact existant' },
+        { id: 'emailContact', value: enterprise.email || enterprise.email_contact, label: 'Email existant' },
+        { id: 'telephoneContact', value: enterprise.telephone || enterprise.portable, label: 'Téléphone existant' }
+    ];
+    
+    fields.forEach(field => {
+        const element = document.getElementById(field.id);
+        if (element && field.value) {
+            element.value = field.value;
+            element.style.backgroundColor = '#f0f0f0';
+            element.style.color = '#666';
+        }
+    });
+}
+
+function fillFormatPreferences(enterprise) {
+    // Vérifier si format historique disponible
+    const historicalFormat = enterprise.format_encart_2025 || enterprise._original?.format_encart_2025;
+    
+    if (historicalFormat) {
+        const mappedFormat = mapBaserowFormats(historicalFormat);
+        console.log('🎯 Format historique détecté:', mappedFormat);
+        
+        // Ajouter automatiquement une parution avec ce format
+        setTimeout(() => {
+            if (document.getElementById('publicationsList')) {
+                // S'assurer qu'il y a au moins une parution
+                if (document.querySelectorAll('.publication-item').length === 0) {
+                    addPublication();
+                }
+                
+                // Pré-remplir la première parution
+                const firstFormatSelect = document.querySelector('.publication-format');
+                if (firstFormatSelect) {
+                    firstFormatSelect.value = mappedFormat;
+                    firstFormatSelect.style.border = '2px solid #fbbf24';
+                    firstFormatSelect.style.backgroundColor = '#fff3cd';
+                    
+                    // Déclencher la mise à jour du prix
+                    const publicationId = firstFormatSelect.id.split('-')[1];
+                    updatePublicationPrice(publicationId);
+                }
+            }
+        }, 200);
+    }
+}
+
+function fillPaymentPreferences(enterprise) {
+    const paiementSelect = document.getElementById('modePaiement');
+    if (paiementSelect) {
+        // Utiliser Virement par défaut pour les clients existants
+        if (enterprise.Client_2025 === 'Oui' || enterprise.client_2025 === 'Oui') {
+            paiementSelect.value = 'Virement';
+        }
+    }
+}
+
+function fillAutoComments(enterprise) {
+    const commentairesField = document.getElementById('commentaires');
+    if (commentairesField && !commentairesField.value) {
+        const autoComment = generateAdvancedAutoComment(enterprise);
+        commentairesField.value = autoComment;
+        commentairesField.style.fontStyle = 'italic';
+        commentairesField.style.color = '#666';
+    }
+}
+
+function generateAdvancedAutoComment(enterprise) {
+    const currentYear = new Date().getFullYear();
+    let comments = [];
+    
+    // Type de client
+    if (enterprise.Client_2025 === 'Oui' || enterprise.client_2025 === 'Oui') {
+        comments.push(`🔄 Renouvellement ${currentYear} - Client fidèle`);
+    } else {
+        comments.push(`🆕 Nouveau client ${currentYear}`);
+    }
+    
+    // Format habituel
+    if (enterprise.format_encart_2025) {
+        const format = mapBaserowFormats(enterprise.format_encart_2025);
+        comments.push(`📋 Format habituel: ${format}`);
+    }
+    
+    // Infos secteur si disponible
+    if (enterprise.secteur_activite || enterprise.activite) {
+        const secteur = enterprise.secteur_activite || enterprise.activite;
+        comments.push(`🏢 Secteur: ${secteur}`);
+    }
+    
+    return comments.join(' • ');
+}
+
+function mapBaserowFormats(baserowFormatId) {
+    const formatMapping = {
+        2984058: '6X4',   // 6X4
+        2984059: '6X8',   // 6X8  
+        2984060: '12X4'   // 12X4
+    };
+    return formatMapping[baserowFormatId] || '6X4';
+}
+
+function showAutoFillStatus(message) {
+    const statusDiv = document.getElementById('autoFillStatus');
+    if (statusDiv) {
+        statusDiv.style.display = 'block';
+        statusDiv.innerHTML = `
+            <div style="background: #d1ecf1; padding: 8px; border-radius: 6px; margin: 10px 0; font-size: 12px;">
+                🤖 <strong>${message}</strong>
+            </div>
+        `;
+    }
+}
+
+function setupFieldValidation() {
+    // Validation des publications en temps réel
+    document.addEventListener('change', function(e) {
+        if (e.target.matches('.publication-mois, .publication-format')) {
+            validatePublicationField(e.target);
+        }
+    });
+    
+    // Validation email
+    document.addEventListener('input', function(e) {
+        if (e.target.id === 'emailContact') {
+            validateEmailField(e.target);
+        }
+    });
+}
+
+function validatePublicationField(field) {
+    const formField = field.closest('.form-field');
+    
+    if (field.value) {
+        formField.classList.remove('error');
+        formField.classList.add('success');
+    } else {
+        formField.classList.remove('success');
+        formField.classList.add('error');
+    }
+}
+
+function validateEmailField(emailField) {
+    const formField = emailField.closest('.form-field');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    if (emailField.value && emailRegex.test(emailField.value)) {
+        formField.classList.remove('error');
+        formField.classList.add('success');
+    } else if (emailField.value) {
+        formField.classList.remove('success');
+        formField.classList.add('error');
+    } else {
+        formField.classList.remove('success', 'error');
+    }
+}
+
+function initializePublications() {
+    if (document.getElementById('publicationsList')) {
+        publicationCounter = 0;
+        publicationsData = [];
+        
+        // Ajouter une première parution par défaut
+        setTimeout(() => {
+            addPublication();
+        }, 100);
+    }
+}
+
+// ================================
 // 🌐 EXPOSITION GLOBALE DES FONCTIONS
 // ================================
 // Exposition des fonctions principales pour compatibilité avec les événements onclick
@@ -599,6 +1332,14 @@ window.callAgentOrchestrator = callAgentOrchestrator;
 window.sendDocumentByEmail = sendDocumentByEmail;
 window.generateFromQualification = generateFromQualification;
 window.generateDocumentWithQualification = generateDocumentWithQualification;
+
+// Exposition des nouvelles fonctions de qualification
+window.addPublication = addPublication;
+window.removePublication = removePublication;
+window.updatePublicationPrice = updatePublicationPrice;
+window.createQualification = createQualification;
+window.offerFreeFourthPublication = offerFreeFourthPublication;
+window.applyLoyaltyDiscount = applyLoyaltyDiscount;
 
 // Exposition des gestionnaires pour les événements onclick
 window.navigationManager = navigationManager;
